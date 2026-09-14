@@ -21,10 +21,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_FILE = os.path.join(BASE_DIR, "users_db.json")
 
 # ================= ================= =================
-# AUTO-EXTRACTION DE LA ZIP DES PHOTOS AU DÉMARRAGE
+# EXTRACTION AUTOMATIQUE DES PHOTOS (photos all.zip)
 # ================= ================= =================
-PHOTOS_DIR = os.path.join(BASE_DIR, "photos_resized")
-ZIP_PATH = os.path.join(BASE_DIR, "photos_resized.zip")
+PHOTOS_DIR = os.path.join(BASE_DIR, "photos_all_resized")
+ZIP_PATH = os.path.join(BASE_DIR, "photos all.zip")
 
 if os.path.exists(ZIP_PATH) and not os.path.exists(PHOTOS_DIR):
     try:
@@ -34,7 +34,7 @@ if os.path.exists(ZIP_PATH) and not os.path.exists(PHOTOS_DIR):
     except Exception:
         pass
 
-# Fallback للاحتياط إيلا كان المجلد العادي هو المستعمل
+# Fallback للاحتياط
 if not os.path.exists(PHOTOS_DIR):
     PHOTOS_DIR = os.path.join(BASE_DIR, "photos")
 
@@ -413,7 +413,7 @@ elif found_photo_path:
 
 with col_p2:
     if active_photo_path:
-        st.image(active_photo_path, width=115, caption="✅ Photo prête (233x166)")
+        st.image(active_photo_path, width=115, caption="✅ Photo prête (2cm x 1.4cm)")
     else:
         st.warning("⚠️ Photo non trouvée. Vous pouvez l'importer manuellement.")
 
