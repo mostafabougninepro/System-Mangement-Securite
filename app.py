@@ -245,10 +245,8 @@ def get_agent_photo(matricule):
     
     target = str(matricule).strip().lower()
     clean_target = "".join(c for c in target if c.isalnum()).lower()
-    
     extracted_photo_path = os.path.join(BASE_DIR, "_extracted_agent_photo.png")
 
-    # 1. قلب فملفات الـ ZIP المتاحة في الدومصي أولاً (بحال photos.zip, all.zip, etc.)
     try:
         zip_files = [f for f in os.listdir(BASE_DIR) if f.lower().endswith(".zip")]
         for zf_name in zip_files:
@@ -260,16 +258,13 @@ def get_agent_photo(matricule):
                     if ext.lower() not in ['.jpg', '.jpeg', '.png']:
                         continue
                     clean_name_part = "".join(c for c in name_part if c.isalnum()).lower()
-                    
                     if clean_target == clean_name_part or clean_target in clean_name_part or clean_name_part in clean_target:
-                        # استخراج الصورة مؤقتاً للاستعمال
                         with z.open(file_in_zip) as src, open(extracted_photo_path, "wb") as dst:
                             dst.write(src.read())
                         return extracted_photo_path, "Photo trouvée dans ZIP"
     except Exception:
         pass
 
-    # 2. قلب في المجلدات العادية كبديل (إلا كان شي دوسي بحال photos)
     try:
         for root, dirs, files in os.walk(BASE_DIR):
             if "venv" in root or "__pycache__" in root:
@@ -279,7 +274,6 @@ def get_agent_photo(matricule):
                 if ext.lower() not in ['.jpg', '.jpeg', '.png']:
                     continue
                 clean_name_part = "".join(c for c in name_part if c.isalnum()).lower()
-                
                 if clean_target == clean_name_part or clean_target in clean_name_part or clean_name_part in clean_target:
                     return os.path.join(root, file_name), "Photo trouvée en dossier"
     except Exception:
@@ -288,14 +282,10 @@ def get_agent_photo(matricule):
     return None, "Photo non trouvable"
 
 def get_agent_info_complet(matricule):
-    excel_filenames = [
-        f for f in os.listdir(BASE_DIR) 
-        if f.lower().endswith(".xlsx") 
-        and f.lower() not in ["cft.xlsx", "cl.xlsx", "crmv.xlsx", "ctr.xlsx"]
-    ]
+    excel_filenames = [f for f in os.listdir(BASE_DIR) if f.lower().endswith(".xlsx")]
     
     info = {
-        "Nom": "", "Prenom": "", "Fonction": "Chef de Trains",
+        "Nom": "", "Prenom": "", "Fonction": "Chef de Formation",
         "Date_Autorisation": "", "Examen_Medical": "",
         "Examen_Psychotechnique": "", "Examen_Professionnel": "",
         "Engin": "", "Ligne_Site": ""
@@ -305,6 +295,9 @@ def get_agent_info_complet(matricule):
         return info
     
     target = str(matricule).strip().lower()
+    
+    # أعطِ الأولوية لملفات التحيين أو السجل إذا وجدت
+    excel_filenames = sorted(excel_filenames, key=lambda x: 0 if "mis" in x.lower() or "maj" in x.lower() or "registre" in x.lower() else 1)
     
     for excel_filename in excel_filenames:
         excel_path = os.path.join(BASE_DIR, excel_filename)
@@ -338,15 +331,22 @@ def get_agent_info_complet(matricule):
                                 return str(val).strip()
                             return ""
 
-                        info["Nom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower().strip() in ["nom", "nom & prénom", "nom et prénom"] and pd.notnull(data[c])), info["Nom"])
-                        info["Prenom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower().strip() in ["prénom", "prenom"] and pd.notnull(data[c])), info["Prenom"])
+                        # 1. الاسم والكنية والوظيفة من السجل / Mis_A_Jour
+                        if not info["Nom"]:
+                            info["Nom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower().strip() in ["nom", "nom & prénom", "nom et prénom"] and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                        if not info["Prenom"]:
+                            info["Prenom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower().strip() in ["prénom", "prenom"] and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
                         
-                        fct = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["fonction", "titre", "emploi"]) and pd.notnull(data[c])), "")
-                        if fct and fct.lower() != "nan": info["Fonction"] = fct
+                        fct = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["fonction", "titre", "emploi"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                        if fct: 
+                            info["Fonction"] = fct
                         
-                        info["Ligne_Site"] = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["ligne", "site", "parcours"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
-                        info["Engin"] = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["engin", "materiel", "loco", "rame"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                        if not info["Ligne_Site"]:
+                            info["Ligne_Site"] = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["ligne", "site", "parcours"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                        if not info["Engin"]:
+                            info["Engin"] = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["engin", "materiel", "loco", "rame"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
                         
+                        # 2. استخراج التواريخ بدقة من الملفات
                         for col in df.columns:
                             col_l = str(col).lower()
                             val_cell = data[col]
@@ -364,7 +364,6 @@ def get_agent_info_complet(matricule):
                                 elif any(k in col_l for k in ["professionnel", "prof", "evaluation", "eval"]):
                                     if not info["Examen_Professionnel"]: info["Examen_Professionnel"] = formatted_d
 
-                        return info
         except Exception:
             continue
     return info
