@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import zipfile
 import openpyxl
 from openpyxl.drawing.image import Image as OpenpyxlImage
 import pandas as pd
@@ -18,7 +19,6 @@ st.set_page_config(
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_FILE = os.path.join(BASE_DIR, "users_db.json")
-PHOTOS_DIR = os.path.join(BASE_DIR, "photos")
 
 # ================= ================= =================
 # CSS PROPRE & DESIGN ONCF
@@ -244,23 +244,47 @@ def get_agent_photo(matricule):
         return None, "Matricule vide"
     
     target = str(matricule).strip().lower()
-    # تنظيف الماتريكول من الرموز للمقارنة المرنة
     clean_target = "".join(c for c in target if c.isalnum()).lower()
     
-    if os.path.exists(PHOTOS_DIR):
-        try:
-            for root, dirs, files in os.walk(PHOTOS_DIR):
-                for file_name in files:
-                    name_part, ext = os.path.splitext(file_name)
+    extracted_photo_path = os.path.join(BASE_DIR, "_extracted_agent_photo.png")
+
+    # 1. قلب فملفات الـ ZIP المتاحة في الدومصي أولاً (بحال photos.zip, all.zip, etc.)
+    try:
+        zip_files = [f for f in os.listdir(BASE_DIR) if f.lower().endswith(".zip")]
+        for zf_name in zip_files:
+            zf_path = os.path.join(BASE_DIR, zf_name)
+            with zipfile.ZipFile(zf_path, 'r') as z:
+                for file_in_zip in z.namelist():
+                    base_name = os.path.basename(file_in_zip)
+                    name_part, ext = os.path.splitext(base_name)
                     if ext.lower() not in ['.jpg', '.jpeg', '.png']:
                         continue
                     clean_name_part = "".join(c for c in name_part if c.isalnum()).lower()
                     
-                    # مطابقة دقيقة أو جزئية
                     if clean_target == clean_name_part or clean_target in clean_name_part or clean_name_part in clean_target:
-                        return os.path.join(root, file_name), "Photo trouvée"
-        except Exception:
-            pass
+                        # استخراج الصورة مؤقتاً للاستعمال
+                        with z.open(file_in_zip) as src, open(extracted_photo_path, "wb") as dst:
+                            dst.write(src.read())
+                        return extracted_photo_path, "Photo trouvée dans ZIP"
+    except Exception:
+        pass
+
+    # 2. قلب في المجلدات العادية كبديل (إلا كان شي دوسي بحال photos)
+    try:
+        for root, dirs, files in os.walk(BASE_DIR):
+            if "venv" in root or "__pycache__" in root:
+                continue
+            for file_name in files:
+                name_part, ext = os.path.splitext(file_name)
+                if ext.lower() not in ['.jpg', '.jpeg', '.png']:
+                    continue
+                clean_name_part = "".join(c for c in name_part if c.isalnum()).lower()
+                
+                if clean_target == clean_name_part or clean_target in clean_name_part or clean_name_part in clean_target:
+                    return os.path.join(root, file_name), "Photo trouvée en dossier"
+    except Exception:
+        pass
+
     return None, "Photo non trouvable"
 
 def get_agent_info_complet(matricule):
@@ -396,7 +420,7 @@ elif found_photo_path:
 
 with col_p2:
     if active_photo_path:
-        st.image(active_photo_path, width=115, caption="✅ Photo prête")
+        st.image(active_photo_path, width=115, caption=f"✅ {search_status}")
     else:
         st.warning("⚠️ Photo non trouvée. Vous pouvez l'importer manuellement.")
 
