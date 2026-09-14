@@ -113,7 +113,6 @@ CLEAN_CSS = """
     header {visibility: hidden;}
 </style>
 """
-
 st.markdown(CLEAN_CSS, unsafe_allow_html=True)
 
 # ================= ================= =================
@@ -145,12 +144,11 @@ st.session_state.setdefault("current_user", None)
 st.session_state.setdefault("user_role", None)
 
 # ================= ================= =================
-# 2. MODULE DE CONNEXION (LOGIN)
+# 2. MODULE DE CONNEXION
 # ================= ================= =================
 if not st.session_state["logged_in"]:
     st.markdown("<br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1.2, 1])
-    
     with c2:
         st.markdown("""
             <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; border-top: 4px solid #FF6B00;">
@@ -160,7 +158,6 @@ if not st.session_state["logged_in"]:
                 <hr style="border: 0; height: 1px; background: #E2E8F0; margin: 20px 0;">
             </div>
         """, unsafe_allow_html=True)
-        
         with st.form("login_form"):
             input_matricule = st.text_input("Matricule / Identifiant").strip().upper()
             input_password = st.text_input("Mot de passe", type="password")
@@ -179,7 +176,7 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # ================= ================= =================
-# 3. HEADER EXECUTIVE ONCF & MENU
+# 3. HEADER & MENU
 # ================= ================= =================
 st.markdown(f"""
     <div class="exec-header">
@@ -204,7 +201,6 @@ else:
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ⚙️ Session")
-
 if st.sidebar.button("🚪 Déconnexion", use_container_width=True):
     st.session_state["logged_in"] = False
     st.session_state["current_user"] = None
@@ -217,7 +213,6 @@ if st.sidebar.button("🚪 Déconnexion", use_container_width=True):
 if menu == "👥 Gestion des Accès":
     st.markdown("### 👥 Administration des Utilisateurs")
     col_u1, col_u2 = st.columns([1, 1.2])
-    
     with col_u1:
         st.markdown("##### ➕ Nouvel Utilisateur")
         users = load_users()
@@ -235,65 +230,57 @@ if menu == "👥 Gestion des Accès":
                     save_users(users)
                     st.success(f"Compte {new_mat} créé avec succès !")
                     st.rerun()
-                    
     with col_u2:
         st.markdown("##### 📋 Comptes Enregistrés")
         users_list = [{"Matricule": m, "Rôle": d.get("role", "Utilisateur")} for m, d in users.items()]
         st.dataframe(pd.DataFrame(users_list), use_container_width=True)
-        
     st.stop()
 
 # ================= ================= =================
 # 5. GENERATEUR DE CARTES D'HABILITATION
 # ================= ================= =================
-
 def get_agent_photo(matricule):
     if not matricule or not str(matricule).strip():
         return None, "Matricule vide"
     
     target = str(matricule).strip().lower()
+    # تنظيف الماتريكول من الرموز للمقارنة المرنة
     clean_target = "".join(c for c in target if c.isalnum()).lower()
     
     if os.path.exists(PHOTOS_DIR):
         try:
             for root, dirs, files in os.walk(PHOTOS_DIR):
                 for file_name in files:
-                    name_part, _ = os.path.splitext(file_name)
+                    name_part, ext = os.path.splitext(file_name)
+                    if ext.lower() not in ['.jpg', '.jpeg', '.png']:
+                        continue
                     clean_name_part = "".join(c for c in name_part if c.isalnum()).lower()
-                    if clean_target in clean_name_part or clean_name_part in clean_target:
+                    
+                    # مطابقة دقيقة أو جزئية
+                    if clean_target == clean_name_part or clean_target in clean_name_part or clean_name_part in clean_target:
                         return os.path.join(root, file_name), "Photo trouvée"
         except Exception:
             pass
-            
     return None, "Photo non trouvable"
 
-def get_official_agent_info(matricule):
-    excel_path = os.path.join(BASE_DIR, "Mis_A_Jour photos.xlsx")
-    if not os.path.exists(excel_path):
-        return None
-    try:
-        xl = pd.ExcelFile(excel_path)
-        for sheet_name in xl.sheet_names:
-            df = pd.read_excel(excel_path, sheet_name=sheet_name)
-            mle_col = next((c for c in df.columns if str(c).strip().lower() in ["mle", "matricule"]), None)
-            if mle_col:
-                df[mle_col] = df[mle_col].astype(str).str.strip()
-                agent = df[df[mle_col].str.lower() == str(matricule).strip().lower()]
-                if not agent.empty:
-                    row = agent.iloc[0]
-                    return {
-                        "Nom": str(row.get("Nom", "")).strip() if pd.notnull(row.get("Nom")) else "",
-                        "Prenom": str(row.get("Prénom", "")).strip() if pd.notnull(row.get("Prénom")) else "",
-                        "Fonction": str(row.get("Fonction", "")).strip() if pd.notnull(row.get("Fonction")) else ""
-                    }
-    except Exception:
-        pass
-    return None
-
-def get_agent_dates_and_details(matricule):
-    excel_filenames = [f for f in os.listdir(BASE_DIR) if f.lower().endswith(".xlsx") and f.lower() not in ["mis_a_jour photos.xlsx", "cft.xlsx", "cl.xlsx", "crmv.xlsx", "ctr.xlsx"]]
-    if not excel_filenames:
-        return {}
+def get_agent_info_complet(matricule):
+    excel_filenames = [
+        f for f in os.listdir(BASE_DIR) 
+        if f.lower().endswith(".xlsx") 
+        and f.lower() not in ["cft.xlsx", "cl.xlsx", "crmv.xlsx", "ctr.xlsx"]
+    ]
+    
+    info = {
+        "Nom": "", "Prenom": "", "Fonction": "Chef de Trains",
+        "Date_Autorisation": "", "Examen_Medical": "",
+        "Examen_Psychotechnique": "", "Examen_Professionnel": "",
+        "Engin": "", "Ligne_Site": ""
+    }
+    
+    if not excel_filenames or not str(matricule).strip():
+        return info
+    
+    target = str(matricule).strip().lower()
     
     for excel_filename in excel_filenames:
         excel_path = os.path.join(BASE_DIR, excel_filename)
@@ -301,7 +288,8 @@ def get_agent_dates_and_details(matricule):
             xl = pd.ExcelFile(excel_path)
             for sheet_name in xl.sheet_names:
                 df = pd.read_excel(excel_path, sheet_name=sheet_name)
-                mle_col = next((c for c in df.columns if str(c).strip().lower() in ["matricule", "mle", "mat"]), None)
+                
+                mle_col = next((c for c in df.columns if str(c).strip().lower() in ["matricule", "mle", "mat", "N° matricule"]), None)
                 if not mle_col:
                     try:
                         df_header6 = pd.read_excel(excel_path, sheet_name=sheet_name, header=6)
@@ -314,34 +302,51 @@ def get_agent_dates_and_details(matricule):
                 
                 if mle_col:
                     df[mle_col] = df[mle_col].astype(str).str.strip()
-                    agent = df[df[mle_col].str.lower() == str(matricule).strip().lower()]
+                    agent = df[df[mle_col].str.lower() == target]
+                    
                     if not agent.empty:
                         data = agent.iloc[0]
                         def fmt_date(val):
-                            return pd.to_datetime(val).strftime("%Y-%m-%d") if pd.notnull(val) and str(val) != "NaT" and str(val).strip() != "" else ""
+                            if pd.notnull(val) and str(val) != "NaT" and str(val).strip() != "":
+                                dt_parsed = pd.to_datetime(val, errors='coerce')
+                                if pd.notnull(dt_parsed):
+                                    return dt_parsed.strftime("%Y-%m-%d")
+                                return str(val).strip()
+                            return ""
 
-                        ligne_site_val = next((str(data[c]).strip() for c in df.columns if any(k in c.lower() for k in ["ligne", "site", "parcours"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
-                        engin_val = next((str(data[c]).strip() for c in df.columns if any(k in c.lower() for k in ["engin", "materiel", "loco", "rame"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                        info["Nom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower().strip() in ["nom", "nom & prénom", "nom et prénom"] and pd.notnull(data[c])), info["Nom"])
+                        info["Prenom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower().strip() in ["prénom", "prenom"] and pd.notnull(data[c])), info["Prenom"])
                         
-                        dt_auth = next((fmt_date(data[c]) for c in df.columns if "autorisation" in c.lower()), "")
-                        dt_med = next((fmt_date(data[c]) for c in df.columns if "médical" in c.lower() or "vm" in c.lower()), "")
-                        dt_psy = next((fmt_date(data[c]) for c in df.columns if "psy" in c.lower()), "")
-                        dt_prof = next((fmt_date(data[c]) for c in df.columns if any(k in c.lower() for k in ["professionnel", "evaluation", "eval"])), "")
+                        fct = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["fonction", "titre", "emploi"]) and pd.notnull(data[c])), "")
+                        if fct and fct.lower() != "nan": info["Fonction"] = fct
+                        
+                        info["Ligne_Site"] = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["ligne", "site", "parcours"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                        info["Engin"] = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["engin", "materiel", "loco", "rame"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                        
+                        for col in df.columns:
+                            col_l = str(col).lower()
+                            val_cell = data[col]
+                            if pd.isnull(val_cell) or str(val_cell).strip() == "" or str(val_cell).lower() == "nan":
+                                continue
+                            
+                            formatted_d = fmt_date(val_cell)
+                            if formatted_d:
+                                if any(k in col_l for k in ["autorisation", "delivrance", "date d'autorisation", "emis"]):
+                                    if not info["Date_Autorisation"]: info["Date_Autorisation"] = formatted_d
+                                elif any(k in col_l for k in ["médical", "medical", "visite", "vm"]):
+                                    if not info["Examen_Medical"]: info["Examen_Medical"] = formatted_d
+                                elif any(k in col_l for k in ["psy", "psychotechnique"]):
+                                    if not info["Examen_Psychotechnique"]: info["Examen_Psychotechnique"] = formatted_d
+                                elif any(k in col_l for k in ["professionnel", "prof", "evaluation", "eval"]):
+                                    if not info["Examen_Professionnel"]: info["Examen_Professionnel"] = formatted_d
 
-                        return {
-                            "Date_Autorisation": dt_auth,
-                            "Examen_Medical": dt_med,
-                            "Examen_Psychotechnique": dt_psy,
-                            "Examen_Professionnel": dt_prof,
-                            "Engin": engin_val,
-                            "Ligne_Site": ligne_site_val,
-                        }
+                        return info
         except Exception:
             continue
-    return {}
+    return info
 
 def determine_template_and_defaults(fonction):
-    f_lower = fonction.lower().strip()
+    f_lower = str(fonction).lower().strip()
     if "manœuvre" in f_lower or "manoeuvre" in f_lower or "crmv" in f_lower:
         return "CRMV.xlsx", "E1450, E1400, Z2M, DH400, DH350, DM600", "Site Voyageurs Kénitra"
     elif "formation" in f_lower or "cft" in f_lower:
@@ -353,33 +358,26 @@ def determine_template_and_defaults(fonction):
 
 # SECTION: RECHERCHE
 st.markdown("### 🔍 Recherche & Identification de l'Agent")
-
 st.session_state.setdefault("last_matricule", "")
-matricule_search = st.text_input("Saisir le Matricule de l'agent :", placeholder="Exemple: 47607A")
+matricule_search = st.text_input("Saisir le Matricule de l'agent :", placeholder="Exemple: 47622S")
 
 if matricule_search != st.session_state["last_matricule"]:
     st.session_state["last_matricule"] = matricule_search
-    official_info = get_official_agent_info(matricule_search) if matricule_search else None
-    dates_info = get_agent_dates_and_details(matricule_search) if matricule_search else {}
+    agent_info = get_agent_info_complet(matricule_search)
 
-    if official_info:
-        st.session_state["nom"] = official_info["Nom"]
-        st.session_state["prenom"] = official_info["Prenom"]
-        st.session_state["matricule"] = matricule_search
-        st.session_state["fonction"] = official_info["Fonction"]
-    else:
-        st.session_state["nom"] = ""
-        st.session_state["prenom"] = ""
-        st.session_state["matricule"] = matricule_search
-        st.session_state["fonction"] = "Chef de Trains"
+    st.session_state["nom"] = agent_info["Nom"]
+    st.session_state["prenom"] = agent_info["Prenom"]
+    st.session_state["matricule"] = matricule_search
+    st.session_state["fonction"] = agent_info["Fonction"]
 
-    _, def_engins, def_site = determine_template_and_defaults(st.session_state.get("fonction", ""))
-    st.session_state["dt_auth"] = dates_info.get("Date_Autorisation", "")
-    st.session_state["dt_med"] = dates_info.get("Examen_Medical", "")
-    st.session_state["dt_psy"] = dates_info.get("Examen_Psychotechnique", "")
-    st.session_state["dt_prof"] = dates_info.get("Examen_Professionnel", "")
-    st.session_state["lignes"] = dates_info.get("Ligne_Site") or def_site
-    st.session_state["engins"] = dates_info.get("Engin") or def_engins
+    _, def_engins, def_site = determine_template_and_defaults(st.session_state["fonction"])
+    
+    st.session_state["dt_auth"] = agent_info["Date_Autorisation"]
+    st.session_state["dt_med"] = agent_info["Examen_Medical"]
+    st.session_state["dt_psy"] = agent_info["Examen_Psychotechnique"]
+    st.session_state["dt_prof"] = agent_info["Examen_Professionnel"]
+    st.session_state["lignes"] = agent_info["Ligne_Site"] or def_site
+    st.session_state["engins"] = agent_info["Engin"] or def_engins
 
 found_photo_path, search_status = get_agent_photo(matricule_search)
 
@@ -398,7 +396,7 @@ elif found_photo_path:
 
 with col_p2:
     if active_photo_path:
-        st.image(active_photo_path, width=115, caption="✅ Photo prête (2cm x 1.4cm)")
+        st.image(active_photo_path, width=115, caption="✅ Photo prête")
     else:
         st.warning("⚠️ Photo non trouvée. Vous pouvez l'importer manuellement.")
 
@@ -408,7 +406,6 @@ st.markdown("---")
 st.markdown("### 📝 Informations d'Habilitation")
 
 col1, col2 = st.columns(2)
-
 with col1:
     nom_input = st.text_input("Nom", key="nom")
     matricule_input = st.text_input("Matricule", key="matricule")
