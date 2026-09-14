@@ -282,8 +282,6 @@ def get_agent_photo(matricule):
     return None, "Photo non trouvable"
 
 def get_agent_info_complet(matricule):
-    excel_filenames = [f for f in os.listdir(BASE_DIR) if f.lower().endswith(".xlsx")]
-    
     info = {
         "Nom": "", "Prenom": "", "Fonction": "Chef de Formation",
         "Date_Autorisation": "", "Examen_Medical": "",
@@ -291,81 +289,104 @@ def get_agent_info_complet(matricule):
         "Engin": "", "Ligne_Site": ""
     }
     
-    if not excel_filenames or not str(matricule).strip():
+    if not matricule or not str(matricule).strip():
         return info
     
     target = str(matricule).strip().lower()
+    excel_filenames = [f for f in os.listdir(BASE_DIR) if f.lower().endswith(".xlsx")]
     
-    # أعطِ الأولوية لملفات التحيين أو السجل إذا وجدت
-    excel_filenames = sorted(excel_filenames, key=lambda x: 0 if "mis" in x.lower() or "maj" in x.lower() or "registre" in x.lower() else 1)
-    
-    for excel_filename in excel_filenames:
+    def fmt_date(val):
+        if pd.notnull(val) and str(val) != "NaT" and str(val).strip() != "":
+            dt_parsed = pd.to_datetime(val, errors='coerce')
+            if pd.notnull(dt_parsed):
+                return dt_parsed.strftime("%Y-%m-%d")
+            return str(val).strip()
+        return ""
+
+    # 1. جلب الاسم، الكنية، والوظيفة من الجدول الآخر (ملفات غير السجل)
+    other_files = [f for f in excel_filenames if "registre" not in f.lower()]
+    for excel_filename in other_files:
         excel_path = os.path.join(BASE_DIR, excel_filename)
         try:
             xl = pd.ExcelFile(excel_path)
             for sheet_name in xl.sheet_names:
-                df = pd.read_excel(excel_path, sheet_name=sheet_name)
-                
-                mle_col = next((c for c in df.columns if str(c).strip().lower() in ["matricule", "mle", "mat", "N° matricule"]), None)
-                if not mle_col:
+                for hdr in [0, 6, None]:
                     try:
-                        df_header6 = pd.read_excel(excel_path, sheet_name=sheet_name, header=6)
-                        df_header6.columns = [str(c).strip() for c in df_header6.columns]
-                        mle_col = next((c for c in df_header6.columns if str(c).strip().lower() in ["matricule", "mle", "mat"]), None)
+                        df = pd.read_excel(excel_path, sheet_name=sheet_name, header=hdr)
+                        df.columns = [str(c).strip() for c in df.columns]
+                        
+                        mle_col = next((c for c in df.columns if str(c).lower() in ["matricule", "mle", "mat", "N° matricule"]), None)
                         if mle_col:
-                            df = df_header6
-                    except Exception:
-                        pass
-                
-                if mle_col:
-                    df[mle_col] = df[mle_col].astype(str).str.strip()
-                    agent = df[df[mle_col].str.lower() == target]
-                    
-                    if not agent.empty:
-                        data = agent.iloc[0]
-                        def fmt_date(val):
-                            if pd.notnull(val) and str(val) != "NaT" and str(val).strip() != "":
-                                dt_parsed = pd.to_datetime(val, errors='coerce')
-                                if pd.notnull(dt_parsed):
-                                    return dt_parsed.strftime("%Y-%m-%d")
-                                return str(val).strip()
-                            return ""
-
-                        # 1. الاسم والكنية والوظيفة من السجل / Mis_A_Jour
-                        if not info["Nom"]:
-                            info["Nom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower().strip() in ["nom", "nom & prénom", "nom et prénom"] and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
-                        if not info["Prenom"]:
-                            info["Prenom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower().strip() in ["prénom", "prenom"] and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
-                        
-                        fct = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["fonction", "titre", "emploi"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
-                        if fct: 
-                            info["Fonction"] = fct
-                        
-                        if not info["Ligne_Site"]:
-                            info["Ligne_Site"] = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["ligne", "site", "parcours"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
-                        if not info["Engin"]:
-                            info["Engin"] = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["engin", "materiel", "loco", "rame"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
-                        
-                        # 2. استخراج التواريخ بدقة من الملفات
-                        for col in df.columns:
-                            col_l = str(col).lower()
-                            val_cell = data[col]
-                            if pd.isnull(val_cell) or str(val_cell).strip() == "" or str(val_cell).lower() == "nan":
-                                continue
+                            df[mle_col] = df[mle_col].astype(str).str.strip()
+                            agent = df[df[mle_col].str.lower() == target]
                             
-                            formatted_d = fmt_date(val_cell)
-                            if formatted_d:
-                                if any(k in col_l for k in ["autorisation", "delivrance", "date d'autorisation", "emis"]):
-                                    if not info["Date_Autorisation"]: info["Date_Autorisation"] = formatted_d
-                                elif any(k in col_l for k in ["médical", "medical", "visite", "vm"]):
-                                    if not info["Examen_Medical"]: info["Examen_Medical"] = formatted_d
-                                elif any(k in col_l for k in ["psy", "psychotechnique"]):
-                                    if not info["Examen_Psychotechnique"]: info["Examen_Psychotechnique"] = formatted_d
-                                elif any(k in col_l for k in ["professionnel", "prof", "evaluation", "eval"]):
-                                    if not info["Examen_Professionnel"]: info["Examen_Professionnel"] = formatted_d
-
+                            if not agent.empty:
+                                data = agent.iloc[0]
+                                if not info["Nom"]:
+                                    info["Nom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower() in ["nom", "nom & prénom", "nom et prénom"] and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                                if not info["Prenom"]:
+                                    info["Prenom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower() in ["prénom", "prenom"] and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                                
+                                fct = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["fonction", "titre", "emploi"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                                if fct: info["Fonction"] = fct
+                                
+                                if not info["Ligne_Site"]:
+                                    info["Ligne_Site"] = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["ligne", "site", "parcours"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                                if not info["Engin"]:
+                                    info["Engin"] = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["engin", "materiel", "loco", "rame"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                    except Exception:
+                        continue
         except Exception:
             continue
+
+    # 2. جلب التواريخ حصرياً من ملف السجل (Registre des habilitations)
+    registre_files = [f for f in excel_filenames if "registre" in f.lower()]
+    for excel_filename in registre_files:
+        excel_path = os.path.join(BASE_DIR, excel_filename)
+        try:
+            xl = pd.ExcelFile(excel_path)
+            for sheet_name in xl.sheet_names:
+                for hdr in [0, 6, None]:
+                    try:
+                        df = pd.read_excel(excel_path, sheet_name=sheet_name, header=hdr)
+                        df.columns = [str(c).strip() for c in df.columns]
+                        
+                        mle_col = next((c for c in df.columns if str(c).lower() in ["matricule", "mle", "mat", "N° matricule"]), None)
+                        if mle_col:
+                            df[mle_col] = df[mle_col].astype(str).str.strip()
+                            agent = df[df[mle_col].str.lower() == target]
+                            
+                            if not agent.empty:
+                                data = agent.iloc[0]
+                                
+                                # إذا لم يتم العثور على الاسم/الكنية/الوظيفة في الجدول الآخر، يمكن أخذهم من السجل كاحتياط
+                                if not info["Nom"]:
+                                    info["Nom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower() in ["nom", "nom & prénom", "nom et prénom"] and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                                if not info["Prenom"]:
+                                    info["Prenom"] = next((str(data[c]).strip() for c in df.columns if str(c).lower() in ["prénom", "prenom"] and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                                fct_reg = next((str(data[c]).strip() for c in df.columns if any(k in str(c).lower() for k in ["fonction", "titre", "emploi"]) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                                if fct_reg and info["Fonction"] == "Chef de Formation":
+                                    info["Fonction"] = fct_reg
+
+                                # استخراج التواريخ حصرياً من السجل
+                                for col in df.columns:
+                                    col_l = str(col).lower()
+                                    val_cell = data[col]
+                                    formatted_d = fmt_date(val_cell)
+                                    if formatted_d:
+                                        if any(k in col_l for k in ["autorisation", "delivrance", "date d'autorisation", "emis"]):
+                                            if not info["Date_Autorisation"]: info["Date_Autorisation"] = formatted_d
+                                        elif any(k in col_l for k in ["médical", "medical", "visite", "vm"]):
+                                            if not info["Examen_Medical"]: info["Examen_Medical"] = formatted_d
+                                        elif any(k in col_l for k in ["psy", "psychotechnique"]):
+                                            if not info["Examen_Psychotechnique"]: info["Examen_Psychotechnique"] = formatted_d
+                                        elif any(k in col_l for k in ["professionnel", "prof", "evaluation", "eval"]):
+                                            if not info["Examen_Professionnel"]: info["Examen_Professionnel"] = formatted_d
+                    except Exception:
+                        continue
+        except Exception:
+            continue
+
     return info
 
 def determine_template_and_defaults(fonction):
