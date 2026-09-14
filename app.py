@@ -270,15 +270,10 @@ def get_agent_photo(matricule):
     
     if os.path.exists(photos_dir):
         try:
-            for ext in [".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG", ".jfif", ".webp"]:
-                file_name = f"{target}{ext}"
-                full_path = os.path.join(photos_dir, file_name)
-                if os.path.exists(full_path):
-                    return full_path, "Photo trouvée [photos]"
-            
             for root, dirs, files in os.walk(photos_dir):
                 for file_name in files:
                     name_part, _ = os.path.splitext(file_name)
+                    # مقارنة بـ lower لمنع أي خطأ في الحروف الكبيرة والصغيرة
                     if name_part.strip().lower() == target:
                         return os.path.join(root, file_name), "Photo trouvée [photos]"
         except Exception:
@@ -397,16 +392,27 @@ if matricule_search != st.session_state["last_matricule"]:
     st.session_state["lignes"] = dates_info.get("Ligne_Site") or def_site
     st.session_state["engins"] = dates_info.get("Engin") or def_engins
 
+# البحث التلقائي وفي نفس الوقت إمكانية الرفع اليدوي لضمان الخدمة أينما كان المستخدم
 found_photo_path, search_status = get_agent_photo(matricule_search)
 
-col_p1, col_p2 = st.columns([1, 3])
+col_p1, col_p2 = st.columns([1, 2])
 with col_p1:
-    if found_photo_path:
-        st.image(found_photo_path, caption=f"✅ {search_status}", width=115)
-    elif matricule_search.strip():
-        st.warning("⚠️ Photo non trouvée dans les dossiers")
+    uploaded_file = st.file_uploader("Photo d'identité (Optionnel)", type=["jpg", "jpeg", "png"])
+
+active_photo_path = None
+if uploaded_file is not None:
+    temp_uploaded_path = os.path.join(BASE_DIR, "_uploaded_temp_photo.png")
+    with open(temp_uploaded_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    active_photo_path = temp_uploaded_path
+elif found_photo_path:
+    active_photo_path = found_photo_path
+
+with col_p2:
+    if active_photo_path:
+        st.image(active_photo_path, width=115, caption="✅ Photo prête")
     else:
-        st.info("Veuillez saisir un matricule.")
+        st.warning("⚠️ Photo non trouvée. Vous pouvez l'importer manuellement via le bouton ci-contre.")
 
 st.markdown("---")
 
@@ -450,10 +456,9 @@ def generate_custom_excel():
     sheet["L4"] = materiel_locos
     sheet["Q4"] = lignes_sites
 
-    # إدخال الصورة مباشرة بدون أي تعديلات معقدة للحجم
-    if found_photo_path and os.path.exists(found_photo_path):
+    if active_photo_path and os.path.exists(active_photo_path):
         try:
-            xl_img = OpenpyxlImage(found_photo_path)
+            xl_img = OpenpyxlImage(active_photo_path)
             sheet.add_image(xl_img, "B5")
         except Exception:
             pass
