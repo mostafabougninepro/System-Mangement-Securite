@@ -49,8 +49,6 @@ st.markdown(CLEAN_CSS, unsafe_allow_html=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_FILE = os.path.join(BASE_DIR, "users_db.json")
-
-# Hada howa l-modification: "photos all.zip" b s-s (photos)
 PHOTOS_ZIP = os.path.join(BASE_DIR, "photos all.zip")
 EXTRACTED_PHOTOS_DIR = os.path.join(BASE_DIR, "_extracted_photos")
 
@@ -271,15 +269,15 @@ def determine_template_and_mapping(fonction):
         "default_site": default_sit,
         "cells": {
             "fonction": "D4",
-            "nom": "E5",
-            "prenom": "H5",
-            "matricule": "E6",
-            "dt_auth": "E9",
-            "dt_prof": "E10",
-            "dt_med": "E11",
-            "dt_psy": "E12",
-            "engins": "J4",
-            "lignes": "K4",
+            "nom": "F5",
+            "prenom": "I5",
+            "matricule": "F6",
+            "dt_auth": "F9",
+            "dt_prof": "F10",
+            "dt_med": "F11",
+            "dt_psy": "F12",
+            "engins": "K4",
+            "lignes": "L4",
             "photo_cell": "B5"
         }
     }
@@ -344,8 +342,8 @@ with col2:
     dt_professionnel = st.text_input("Date examen professionnel", key="dt_prof")
     dt_psycho = st.text_input("Date examen psychotechnique", key="dt_psy")
 
-lignes_sites = st.text_input("Lignes / Sites autorisés", key="lignes")
-materiel_locos = st.text_input("Matériel / Locos / Rames", key="engins")
+lignes_sites = st.text_input("Lignes autorisées", key="lignes")
+materiel_locos = st.text_input("Matériel / Locos / Rames autorisées", key="engins")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
