@@ -270,8 +270,9 @@ def get_agent_photo(matricule):
         return None, "Matricule vide"
     
     target = str(matricule).strip().lower()
+    clean_target = "".join(c for c in target if c.isalnum()).lower()
     
-    # 1. البحث المباشر والمرن داخل ملف الـ ZIP
+    # 1. البحث المرن بالتضمين داخل ملف الـ ZIP
     if os.path.exists(ZIP_PATH):
         try:
             with zipfile.ZipFile(ZIP_PATH, 'r') as zip_ref:
@@ -280,27 +281,24 @@ def get_agent_photo(matricule):
                     if not base_name:
                         continue
                     name_part, _ = os.path.splitext(base_name)
-                    
-                    # تنظيف دقيق يتجاوز الفراغات والرموز الخفية
                     clean_name_part = "".join(c for c in name_part if c.isalnum()).lower()
-                    clean_target = "".join(c for c in target if c.isalnum()).lower()
                     
-                    if clean_name_part == clean_target:
+                    # إذا كان اسم الصورة يحتوي على الماتريكول المدخل
+                    if clean_target in clean_name_part or clean_name_part in clean_target:
                         extracted_path = zip_ref.extract(file_name, path=os.path.join(BASE_DIR, "_temp_extracted"))
                         return extracted_path, "Photo trouvée"
         except Exception:
             pass
             
-    # 2. البحث الاحتياطي داخل المجلد المفكوك
+    # 2. البحث المرن بالتضمين داخل المجلد المفكوك
     if os.path.exists(PHOTOS_DIR):
         try:
             for root, dirs, files in os.walk(PHOTOS_DIR):
                 for file_name in files:
                     name_part, _ = os.path.splitext(file_name)
                     clean_name_part = "".join(c for c in name_part if c.isalnum()).lower()
-                    clean_target = "".join(c for c in target if c.isalnum()).lower()
                     
-                    if clean_name_part == clean_target:
+                    if clean_target in clean_name_part or clean_name_part in clean_target:
                         return os.path.join(root, file_name), "Photo trouvée"
         except Exception:
             pass
