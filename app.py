@@ -291,7 +291,7 @@ def get_official_agent_info(matricule):
     return None
 
 def get_agent_dates_and_details(matricule):
-    excel_filenames = [f for f in os.listdir(BASE_DIR) if f.lower().endswith(".xlsx") and f.lower() != "mis_a_jour photos.xlsx"]
+    excel_filenames = [f for f in os.listdir(BASE_DIR) if f.lower().endswith(".xlsx") and f.lower() not in ["mis_a_jour photos.xlsx", "cft.xlsx", "cl.xlsx", "crmv.xlsx", "ctr.xlsx"]]
     if not excel_filenames:
         return {}
     
