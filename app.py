@@ -49,7 +49,9 @@ st.markdown(CLEAN_CSS, unsafe_allow_html=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_FILE = os.path.join(BASE_DIR, "users_db.json")
-PHOTOS_ZIP = os.path.join(BASE_DIR, "photo all.zip")
+
+# Hada howa l-modification: "photos all.zip" b s-s (photos)
+PHOTOS_ZIP = os.path.join(BASE_DIR, "photos all.zip")
 EXTRACTED_PHOTOS_DIR = os.path.join(BASE_DIR, "_extracted_photos")
 
 # ================= ================= =================
@@ -183,7 +185,7 @@ def get_agent_photo(matricule):
                 for file_name in files:
                     name_part, _ = os.path.splitext(file_name)
                     if name_part.strip().lower() == target:
-                        return os.path.join(root, file_name), "Photo trouvée dans photo all.zip"
+                        return os.path.join(root, file_name), "Photo trouvée dans photos all.zip"
         except Exception:
             pass
     return None, "Photo non trouvable"
