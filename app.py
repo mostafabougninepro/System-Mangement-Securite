@@ -271,14 +271,14 @@ def get_agent_photo(matricule):
     
     if os.path.exists(photos_dir):
         try:
-            # البحث السريع المباشر بالامتدادات
-            for ext in [".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"]:
+            # البحث بجميع الامتدادات الممكنة (صغيرة أو كبيرة)
+            for ext in [".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG", ".jfif", ".webp"]:
                 file_name = f"{target}{ext}"
                 full_path = os.path.join(photos_dir, file_name)
                 if os.path.exists(full_path):
                     return full_path, "Photo trouvée [photos]"
             
-            # فحص دقيق وشامل داخل مجلد photos وجميع مجلداته الفرعية
+            # فحص شامل داخل المجلد والمجلدات الفرعية بغض النظر عن حالة الأحرف
             for root, dirs, files in os.walk(photos_dir):
                 for file_name in files:
                     name_part, _ = os.path.splitext(file_name)
@@ -454,16 +454,33 @@ def generate_custom_excel():
     sheet["Q4"] = lignes_sites
 
     if found_photo_path and os.path.exists(found_photo_path):
-        pil_img = PILImage.open(found_photo_path)
-        target_w, target_h = int(2.0 * 37.8), int(1.44 * 37.8)
-        pil_img = pil_img.resize((target_w, target_h), PILImage.Resampling.LANCZOS)
-        
-        img_temp_path = os.path.join(BASE_DIR, "_temp_photo.png")
-        pil_img.save(img_temp_path)
+        try:
+            pil_img = PILImage.open(found_photo_path)
+            
+            # تحويل الصور ذات الشفافية (PNG) لتعمل بشكل صحيح في Excel
+            if pil_img.mode in ("RGBA", "LA") or (pil_img.mode == "P" and "transparency" in pil_img.info):
+                bg = PILImage.new("RGB", pil_img.size, (255, 255, 255))
+                if pil_img.mode == "P":
+                    pil_img = pil_img.convert("RGBA")
+                bg.paste(pil_img, mask=pil_img.split()[3])
+                pil_img = bg
+            else:
+                pil_img = pil_img.convert("RGB")
 
-        xl_img = OpenpyxlImage(img_temp_path)
-        xl_img.width, xl_img.height = target_w, target_h
-        sheet.add_image(xl_img, "B5")
+            # الأبعاد القياسية المطلوبة للبطاقة في Excel
+            target_w, target_h = int(2.0 * 37.8), int(1.44 * 37.8)
+            
+            # ضبط أبعاد الصورة بغض النظر عن كونها مربعة أو مستطيلة بدون تشويه
+            pil_img.thumbnail((target_w, target_h), PILImage.Resampling.LANCZOS)
+            
+            img_temp_path = os.path.join(BASE_DIR, "_temp_photo.png")
+            pil_img.save(img_temp_path, "PNG")
+
+            xl_img = OpenpyxlImage(img_temp_path)
+            xl_img.width, xl_img.height = pil_img.width, pil_img.height
+            sheet.add_image(xl_img, "B5")
+        except Exception:
+            pass
 
     output = io.BytesIO()
     wb.save(output)
