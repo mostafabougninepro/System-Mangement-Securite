@@ -5,7 +5,6 @@ import zipfile
 import openpyxl
 from openpyxl.drawing.image import Image as OpenpyxlImage
 import pandas as pd
-from PIL import Image as PILImage
 import streamlit as st
 
 # ================= ================= =================
@@ -271,14 +270,12 @@ def get_agent_photo(matricule):
     
     if os.path.exists(photos_dir):
         try:
-            # البحث بجميع الامتدادات الممكنة (صغيرة أو كبيرة)
             for ext in [".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG", ".jfif", ".webp"]:
                 file_name = f"{target}{ext}"
                 full_path = os.path.join(photos_dir, file_name)
                 if os.path.exists(full_path):
                     return full_path, "Photo trouvée [photos]"
             
-            # فحص شامل داخل المجلد والمجلدات الفرعية بغض النظر عن حالة الأحرف
             for root, dirs, files in os.walk(photos_dir):
                 for file_name in files:
                     name_part, _ = os.path.splitext(file_name)
@@ -453,31 +450,10 @@ def generate_custom_excel():
     sheet["L4"] = materiel_locos
     sheet["Q4"] = lignes_sites
 
+    # إدخال الصورة مباشرة بدون أي تعديلات معقدة للحجم
     if found_photo_path and os.path.exists(found_photo_path):
         try:
-            pil_img = PILImage.open(found_photo_path)
-            
-            # تحويل الصور ذات الشفافية (PNG) لتعمل بشكل صحيح في Excel
-            if pil_img.mode in ("RGBA", "LA") or (pil_img.mode == "P" and "transparency" in pil_img.info):
-                bg = PILImage.new("RGB", pil_img.size, (255, 255, 255))
-                if pil_img.mode == "P":
-                    pil_img = pil_img.convert("RGBA")
-                bg.paste(pil_img, mask=pil_img.split()[3])
-                pil_img = bg
-            else:
-                pil_img = pil_img.convert("RGB")
-
-            # الأبعاد القياسية المطلوبة للبطاقة في Excel
-            target_w, target_h = int(2.0 * 37.8), int(1.44 * 37.8)
-            
-            # ضبط أبعاد الصورة بغض النظر عن كونها مربعة أو مستطيلة بدون تشويه
-            pil_img.thumbnail((target_w, target_h), PILImage.Resampling.LANCZOS)
-            
-            img_temp_path = os.path.join(BASE_DIR, "_temp_photo.png")
-            pil_img.save(img_temp_path, "PNG")
-
-            xl_img = OpenpyxlImage(img_temp_path)
-            xl_img.width, xl_img.height = pil_img.width, pil_img.height
+            xl_img = OpenpyxlImage(found_photo_path)
             sheet.add_image(xl_img, "B5")
         except Exception:
             pass
