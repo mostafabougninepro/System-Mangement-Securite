@@ -23,8 +23,8 @@ USERS_FILE = os.path.join(BASE_DIR, "users_db.json")
 # ================= ================= =================
 # AUTO-EXTRACTION DE LA ZIP DES PHOTOS AU DÉMARRAGE
 # ================= ================= =================
-PHOTOS_DIR = os.path.join(BASE_DIR, "photos")
-ZIP_PATH = os.path.join(BASE_DIR, "photos.zip")
+PHOTOS_DIR = os.path.join(BASE_DIR, "photos_resized")
+ZIP_PATH = os.path.join(BASE_DIR, "photos_resized.zip")
 
 if os.path.exists(ZIP_PATH) and not os.path.exists(PHOTOS_DIR):
     try:
@@ -33,6 +33,10 @@ if os.path.exists(ZIP_PATH) and not os.path.exists(PHOTOS_DIR):
             zip_ref.extractall(PHOTOS_DIR)
     except Exception:
         pass
+
+# Fallback للاحتياط إيلا كان المجلد العادي هو المستعمل
+if not os.path.exists(PHOTOS_DIR):
+    PHOTOS_DIR = os.path.join(BASE_DIR, "photos")
 
 # ================= ================= =================
 # CSS PROPRE & DESIGN ONCF
@@ -266,16 +270,13 @@ def get_agent_photo(matricule):
         return None, "Matricule vide"
     target = str(matricule).strip().lower()
     
-    photos_dir = os.path.join(BASE_DIR, "photos")
-    
-    if os.path.exists(photos_dir):
+    if os.path.exists(PHOTOS_DIR):
         try:
-            for root, dirs, files in os.walk(photos_dir):
+            for root, dirs, files in os.walk(PHOTOS_DIR):
                 for file_name in files:
                     name_part, _ = os.path.splitext(file_name)
-                    # مقارنة بـ lower لمنع أي خطأ في الحروف الكبيرة والصغيرة
                     if name_part.strip().lower() == target:
-                        return os.path.join(root, file_name), "Photo trouvée [photos]"
+                        return os.path.join(root, file_name), "Photo trouvée"
         except Exception:
             pass
             
@@ -317,11 +318,14 @@ def get_agent_dates_and_details(matricule):
                 df = pd.read_excel(excel_path, sheet_name=sheet_name)
                 mle_col = next((c for c in df.columns if str(c).strip().lower() in ["matricule", "mle", "mat"]), None)
                 if not mle_col:
-                    df_header6 = pd.read_excel(excel_path, sheet_name=sheet_name, header=6)
-                    df_header6.columns = [str(c).strip() for c in df_header6.columns]
-                    mle_col = next((c for c in df_header6.columns if str(c).strip().lower() in ["matricule", "mle", "mat"]), None)
-                    if mle_col:
-                        df = df_header6
+                    try:
+                        df_header6 = pd.read_excel(excel_path, sheet_name=sheet_name, header=6)
+                        df_header6.columns = [str(c).strip() for c in df_header6.columns]
+                        mle_col = next((c for c in df_header6.columns if str(c).strip().lower() in ["matricule", "mle", "mat"]), None)
+                        if mle_col:
+                            df = df_header6
+                    except Exception:
+                        pass
                 
                 if mle_col:
                     df[mle_col] = df[mle_col].astype(str).str.strip()
@@ -392,7 +396,6 @@ if matricule_search != st.session_state["last_matricule"]:
     st.session_state["lignes"] = dates_info.get("Ligne_Site") or def_site
     st.session_state["engins"] = dates_info.get("Engin") or def_engins
 
-# البحث التلقائي وفي نفس الوقت إمكانية الرفع اليدوي لضمان الخدمة أينما كان المستخدم
 found_photo_path, search_status = get_agent_photo(matricule_search)
 
 col_p1, col_p2 = st.columns([1, 2])
@@ -410,9 +413,9 @@ elif found_photo_path:
 
 with col_p2:
     if active_photo_path:
-        st.image(active_photo_path, width=115, caption="✅ Photo prête")
+        st.image(active_photo_path, width=115, caption="✅ Photo prête (233x166)")
     else:
-        st.warning("⚠️ Photo non trouvée. Vous pouvez l'importer manuellement via le bouton ci-contre.")
+        st.warning("⚠️ Photo non trouvée. Vous pouvez l'importer manuellement.")
 
 st.markdown("---")
 
