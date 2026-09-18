@@ -189,8 +189,8 @@ def get_agent_photo(matricule):
     return None, "Photo non trouvable"
 
 def get_official_agent_info(matricule):
-    excel_path = os.path.join(BASE_DIR, "Mis_A_Jour photos.xlsx")
-    if not os.path.exists(excel_path):
+    excel_path = next((os.path.join(BASE_DIR, f) for f in os.listdir(BASE_DIR) if "mis_a_jour" in f.lower() or "photo" in f.lower() and f.endswith(".xlsx")), None)
+    if not excel_path or not os.path.exists(excel_path):
         return None
     try:
         xl = pd.ExcelFile(excel_path)
@@ -247,24 +247,31 @@ def get_agent_dates_and_details(matricule):
 def determine_template_and_mapping(fonction):
     f_lower = fonction.lower().strip()
     if "manœuvre" in f_lower or "manoeuvre" in f_lower or "crmv" in f_lower:
-        tmpl = "CRMV.xlsx"
+        keyword = "crmv"
         default_eng = "E1450 , E1400 , Z2M , DH400 , DH350 , DM600"
         default_sit = "  Site Voyageurs Kénitra "
     elif "formation" in f_lower or "cft" in f_lower:
-        tmpl = "CFT.xlsx"
+        keyword = "cft"
         default_eng = "E1450 , E1400 , E1250 , Z2M , DH400 , DM600"
         default_sit = "  Site Voyageurs Kénitra "
     elif "ligne" in f_lower or "cl" in f_lower:
-        tmpl = "CL.xlsx"
+        keyword = "cl"
         default_eng = "E1450 , E1400 , Z2M"
         default_sit = ""
     else:
-        tmpl = "CTR.xlsx"
+        keyword = "ctr"
         default_eng = "E1450 , E1400 , E1250 , Z2M , DH400"
         default_sit = ""
 
+    # البحث عن اسم الملف المطابق تماماً في المجلد (سواء كان يحتوي على _2 أو نقاط)
+    matched_file = keyword + ".xlsx"
+    for f in os.listdir(BASE_DIR):
+        if f.lower().endswith(".xlsx") and keyword in f.lower():
+            matched_file = f
+            break
+
     return {
-        "template": tmpl,
+        "template": matched_file,
         "default_engins": default_eng,
         "default_site": default_sit,
         "cells": {
@@ -354,12 +361,16 @@ def generate_custom_excel():
     
     tmpl_path = os.path.join(BASE_DIR, tmpl_filename)
     if not os.path.exists(tmpl_path):
-        tmpl_path = next((os.path.join(BASE_DIR, f) for f in os.listdir(BASE_DIR) if f.lower() == tmpl_filename.lower()), os.path.join(BASE_DIR, tmpl_filename))
+        # Fallback في حال لم يجد الملف تحديداً
+        for f in os.listdir(BASE_DIR):
+            if f.endswith(".xlsx") and any(k in f.lower() for k in ["ctr", "cl", "cft", "crmv"]):
+                tmpl_path = os.path.join(BASE_DIR, f)
+                break
 
     wb = openpyxl.load_workbook(tmpl_path)
     sheet = wb.active
 
-    # Injection exacte dans les cellules spécifiées
+    # تعبئة الخلايا بدقة عالية حسب طلبك
     sheet[cells["fonction"]] = fonction_input
     sheet[cells["nom"]] = nom_input
     sheet[cells["prenom"]] = prenom_input
@@ -401,3 +412,4 @@ if st.button("⚡ Générer la Carte d'Habilitation", use_container_width=True):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
+
