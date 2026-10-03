@@ -221,7 +221,6 @@ def get_official_agent_info(matricule):
     return None
 
 @st.cache_data(ttl=60)
-@st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule):
     try:
         req = urllib.request.Request(GOOGLE_SHEET_URL, headers={'User-Agent': 'Mozilla/5.0'})
@@ -233,10 +232,8 @@ def get_agent_dates_and_details(matricule):
         if not rows:
             return {}
             
-        # البحث عن رأس الجدول أو قراءة الصفوف مباشرة
         header = [str(c).strip().lower() for c in rows[0]]
         
-        # إيجاد مكان عمود الماتريكول
         mle_idx = -1
         for i, h in enumerate(header):
             if "matricule" in h or "mle" in h:
@@ -244,7 +241,7 @@ def get_agent_dates_and_details(matricule):
                 break
         
         if mle_idx == -1:
-            mle_idx = 1 # افتراضي حسب الصورة العمود الثاني
+            mle_idx = 1
             
         for row in rows[1:]:
             if len(row) <= mle_idx:
@@ -260,24 +257,37 @@ def get_agent_dates_and_details(matricule):
                         return str(val).strip()
                     return ""
 
-                # استخراج القيم بناءً على الأعمدة الظاهرة في الصورة (الترتيب التقريبي)
-                # رتبة الأعمدة حسب الصورة: Nom/Prénom, Matricule, Résidence, Date d'autorisation, Validité, Date d'expiration ...
                 dt_auth = fmt_date(row[3]) if len(row) > 3 else ""
-                dt_prof = ""
                 dt_med = fmt_date(row[5]) if len(row) > 5 else ""
+                dt_prof = ""
                 dt_psy = ""
                 
-                # بحث عام في الصف عن أي تواريخ صالحة إذا لم تطابق الأعمدة بدقة
                 for cell in row:
                     cell_str = str(cell).strip()
-                    if "/" in cell_str and len(cell_str) == 10: # شكل التاريخ DD/MM/YYYY
+                    if "/" in cell_str and len(cell_str) == 10:
                         parsed = pd.to_datetime(cell_str, errors='coerce', dayfirst=True)
                         if pd.notnull(parsed):
                             formatted = parsed.strftime("%Y-%m-%d")
                             if not dt_med:
                                 dt_med = formatted
                             elif not dt_auth:
-    ...
+                                dt_auth = formatted
+
+                ligne_site_val = next((str(c).strip() for c in row if "kénitra" in str(c).lower() or "site" in str(c).lower()), "")
+                engin_val = ""
+
+                return {
+                    "Date_Autorisation": dt_auth,
+                    "Examen_Medical": dt_med,
+                    "Examen_Psychotechnique": dt_psy,
+                    "Examen_Professionnel": dt_prof,
+                    "Engin": engin_val,
+                    "Ligne_Site": ligne_site_val,
+                }
+    except Exception as e:
+        st.error(f"Erreur Google Sheets: {e}")
+    return {}
+    
 def determine_template_and_mapping(fonction):
     f_lower = fonction.lower().strip()
     if "manœuvre" in f_lower or "manoeuvre" in f_lower or "crmv" in f_lower:
