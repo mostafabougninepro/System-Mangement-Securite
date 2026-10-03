@@ -2,6 +2,8 @@ import io
 import json
 import os
 import zipfile
+import urllib.request
+import csv
 import openpyxl
 from openpyxl.drawing.image import Image as OpenpyxlImage
 import pandas as pd
@@ -52,7 +54,7 @@ USERS_FILE = os.path.join(BASE_DIR, "users_db.json")
 PHOTOS_ZIP = os.path.join(BASE_DIR, "photos all.zip")
 EXTRACTED_PHOTOS_DIR = os.path.join(BASE_DIR, "_extracted_photos")
 
-# رابط Google Sheets للبيانات (ديناميكي ومحدث تلقائياً)
+# رابط Google Sheets بصيغة التصدير المباشر CSV
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1YL34Kw2fPXavwD7WXsFnGpf2NJsr3N40/export?format=csv&gid=0"
 
 # ================= ================= =================
@@ -218,38 +220,41 @@ def get_official_agent_info(matricule):
         pass
     return None
 
-# دالة قراءة التواريخ والبيانات المحدثة مباشرة من Google Sheets السحابي
+# دالة قراءة البيانات من Google Sheets عبر urllib لتجنب أي مشاكل اتصال
 @st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule):
     try:
-        df = pd.read_csv(GOOGLE_SHEET_URL, header=0) # تأكد من تغيير header إلى 0 إذا كان جدولك يبدأ من السطر الأول
-        df.columns = [str(c).strip() for c in df.columns]
-        if "Matricule" in df.columns:
-            df["Matricule"] = df["Matricule"].astype(str).str.strip()
-            agent = df[df["Matricule"].str.lower() == str(matricule).strip().lower()]
-            if not agent.empty:
-                data = agent.iloc[0]
+        req = urllib.request.Request(GOOGLE_SHEET_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            content = response.read().decode('utf-8')
+            
+        reader = csv.DictReader(io.StringIO(content))
+        for row in reader:
+            cleaned_row = {k.strip(): (v.strip() if v else "") for k, v in row.items() if k}
+            mle = cleaned_row.get("Matricule", "")
+            
+            if mle.lower() == str(matricule).strip().lower():
                 def fmt_date(val):
-                    if pd.notnull(val) and str(val) != "NaT" and str(val).strip() != "":
+                    if val and val.lower() != "nan" and val != "NaT":
                         parsed_date = pd.to_datetime(val, errors='coerce')
                         if pd.notnull(parsed_date):
                             return parsed_date.strftime("%Y-%m-%d")
-                        return str(val).strip()
+                        return val
                     return ""
 
-                ligne_site_val = next((str(data[c]).strip() for c in df.columns if ("ligne" in c.lower() or "site" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
-                engin_val = next((str(data[c]).strip() for c in df.columns if ("engin" in c.lower() or "materiel" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                ligne_site_val = next((val for k, val in cleaned_row.items() if any(term in k.lower() for term in ["ligne", "site"]) and val), "")
+                engin_val = next((val for k, val in cleaned_row.items() if any(term in k.lower() for term in ["engin", "materiel"]) and val), "")
 
                 return {
-                    "Date_Autorisation": fmt_date(data.get("Date d'autorisation")),
-                    "Examen_Medical": fmt_date(data.get("Date prochaine VM", data.get("Dernière VM", ""))),
-                    "Examen_Psychotechnique": fmt_date(data.get("Date prochaine Psy", data.get("Dernier Psy", ""))),
-                    "Examen_Professionnel": fmt_date(data.get("Date prochaine évaluation", data.get("Dernière évaluation", ""))),
+                    "Date_Autorisation": fmt_date(cleaned_row.get("Date d'autorisation", "")),
+                    "Examen_Medical": fmt_date(cleaned_row.get("Date prochaine VM", cleaned_row.get("Dernière VM", ""))),
+                    "Examen_Psychotechnique": fmt_date(cleaned_row.get("Date prochaine Psy", cleaned_row.get("Dernier Psy", ""))),
+                    "Examen_Professionnel": fmt_date(cleaned_row.get("Date prochaine évaluation", cleaned_row.get("Dernière évaluation", ""))),
                     "Engin": engin_val,
                     "Ligne_Site": ligne_site_val,
                 }
     except Exception as e:
-        st.error(f"خطأ في قراءة بيانات Google Sheets: {e}")
+        st.error(f"Erreur de lecture Google Sheets: {e}")
     return {}
 
 def determine_template_and_mapping(fonction):
