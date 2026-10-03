@@ -52,6 +52,9 @@ USERS_FILE = os.path.join(BASE_DIR, "users_db.json")
 PHOTOS_ZIP = os.path.join(BASE_DIR, "photos all.zip")
 EXTRACTED_PHOTOS_DIR = os.path.join(BASE_DIR, "_extracted_photos")
 
+# رابط Google Sheets للبيانات (ديناميكي ومحدث تلقائياً)
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1YL34Kw2fPXavwD7WXsFnGpf2NJsr3N40/export?format=csv&gid=0"
+
 # ================= ================= =================
 # 1. BASE DE DONNEES UTILISATEURS
 # ================= ================= =================
@@ -120,7 +123,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-st.sidebar.markdown("### 🏛️ Navigation")
+st.sidebar.markdown("### 🏛️️ Navigation")
 if st.session_state["user_role"] == "Admin":
     menu = st.sidebar.radio("Module actif :", ["🪪 Cartes d'Habilitation", "👥 Gestion des Accès"])
 else:
@@ -215,26 +218,24 @@ def get_official_agent_info(matricule):
         pass
     return None
 
-# دالة قراءة البيانات مباشرة من Google Sheets بشكل ديناميكي
-@st.cache_data(ttl=60) # يتم تحديث البيانات كل 60 ثانية تلقائياً
+# دالة قراءة التواريخ والبيانات المحدثة مباشرة من Google Sheets السحابي
+@st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule):
     try:
-        # رابط ملف Google Sheets مع استخراج الصفحة الأولى مباشرة بصيغة CSV
-        sheet_url = "https://docs.google.com/spreadsheets/d/1YL34Kw2fPXavwD7WXsFnGpf2NJsr3N40/export?format=csv&gid=0"
-        
-        # قراءة البيانات مع تحديد الترويسة في السطر السابع (header=6)
-        df = pd.read_csv(sheet_url, header=6)
-        
-        # تنظيف الأعمدة والبحث عن Matricule
+        df = pd.read_csv(GOOGLE_SHEET_URL, header=6)
         df.columns = [str(c).strip() for c in df.columns]
         if "Matricule" in df.columns:
             df["Matricule"] = df["Matricule"].astype(str).str.strip()
             agent = df[df["Matricule"].str.lower() == str(matricule).strip().lower()]
-            
             if not agent.empty:
                 data = agent.iloc[0]
                 def fmt_date(val):
-                    return pd.to_datetime(val).strftime("%Y-%m-%d") if pd.notnull(val) and str(val) != "NaT" and str(val).strip() != "" else ""
+                    if pd.notnull(val) and str(val) != "NaT" and str(val).strip() != "":
+                        parsed_date = pd.to_datetime(val, errors='coerce')
+                        if pd.notnull(parsed_date):
+                            return parsed_date.strftime("%Y-%m-%d")
+                        return str(val).strip()
+                    return ""
 
                 ligne_site_val = next((str(data[c]).strip() for c in df.columns if ("ligne" in c.lower() or "site" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
                 engin_val = next((str(data[c]).strip() for c in df.columns if ("engin" in c.lower() or "materiel" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
