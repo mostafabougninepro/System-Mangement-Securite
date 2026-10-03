@@ -220,41 +220,40 @@ def get_official_agent_info(matricule):
         pass
     return None
 
-# دالة قراءة البيانات من Google Sheets عبر urllib لتجنب أي مشاكل اتصال
 @st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule):
     try:
-        req = urllib.request.Request(GOOGLE_SHEET_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
-            content = response.read().decode('utf-8')
-            
-        reader = csv.DictReader(io.StringIO(content))
-        for row in reader:
-            cleaned_row = {k.strip(): (v.strip() if v else "") for k, v in row.items() if k}
-            mle = cleaned_row.get("Matricule", "")
-            
-            if mle.lower() == str(matricule).strip().lower():
+        # قراءة Google Sheets مباشرة باستخدام pandas.read_csv مع تجاهل الأخطاء
+        df = pd.read_csv(GOOGLE_SHEET_URL)
+        df.columns = [str(c).strip() for c in df.columns]
+        
+        mle_col = next((c for c in df.columns if "matricule" in c.lower() or "mle" in c.lower()), None)
+        if mle_col:
+            df[mle_col] = df[mle_col].astype(str).str.strip()
+            agent = df[df[mle_col].str.lower() == str(matricule).strip().lower()]
+            if not agent.empty:
+                data = agent.iloc[0]
                 def fmt_date(val):
-                    if val and val.lower() != "nan" and val != "NaT":
+                    if pd.notnull(val) and str(val) != "NaT" and str(val).strip() != "":
                         parsed_date = pd.to_datetime(val, errors='coerce')
                         if pd.notnull(parsed_date):
                             return parsed_date.strftime("%Y-%m-%d")
-                        return val
+                        return str(val).strip()
                     return ""
 
-                ligne_site_val = next((val for k, val in cleaned_row.items() if any(term in k.lower() for term in ["ligne", "site"]) and val), "")
-                engin_val = next((val for k, val in cleaned_row.items() if any(term in k.lower() for term in ["engin", "materiel"]) and val), "")
+                ligne_site_val = next((str(data[c]).strip() for c in df.columns if ("ligne" in c.lower() or "site" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                engin_val = next((str(data[c]).strip() for c in df.columns if ("engin" in c.lower() or "materiel" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
 
                 return {
-                    "Date_Autorisation": fmt_date(cleaned_row.get("Date d'autorisation", "")),
-                    "Examen_Medical": fmt_date(cleaned_row.get("Date prochaine VM", cleaned_row.get("Dernière VM", ""))),
-                    "Examen_Psychotechnique": fmt_date(cleaned_row.get("Date prochaine Psy", cleaned_row.get("Dernier Psy", ""))),
-                    "Examen_Professionnel": fmt_date(cleaned_row.get("Date prochaine évaluation", cleaned_row.get("Dernière évaluation", ""))),
+                    "Date_Autorisation": fmt_date(data.get("Date d'autorisation")),
+                    "Examen_Medical": fmt_date(data.get("Date prochaine VM", data.get("Dernière VM", ""))),
+                    "Examen_Psychotechnique": fmt_date(data.get("Date prochaine Psy", data.get("Dernier Psy", ""))),
+                    "Examen_Professionnel": fmt_date(data.get("Date prochaine évaluation", data.get("Dernière évaluation", ""))),
                     "Engin": engin_val,
                     "Ligne_Site": ligne_site_val,
                 }
     except Exception as e:
-        st.error(f"Erreur de lecture Google Sheets: {e}")
+        st.error(f"Erreur Google Sheets: {e}")
     return {}
 
 def determine_template_and_mapping(fonction):
