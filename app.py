@@ -215,37 +215,40 @@ def get_official_agent_info(matricule):
         pass
     return None
 
+# دالة قراءة البيانات مباشرة من Google Sheets بشكل ديناميكي
+@st.cache_data(ttl=60) # يتم تحديث البيانات كل 60 ثانية تلقائياً
 def get_agent_dates_and_details(matricule):
-    excel_filename = next((f for f in os.listdir(BASE_DIR) if f.lower().endswith(".xlsx") and "registre" in f.lower()), None)
-    if not excel_filename:
-        return {}
-    excel_path = os.path.join(BASE_DIR, excel_filename)
     try:
-        xl = pd.ExcelFile(excel_path)
-        for sheet_name in xl.sheet_names:
-            df = pd.read_excel(excel_path, sheet_name=sheet_name, header=6)
-            df.columns = [str(c).strip() for c in df.columns]
-            if "Matricule" in df.columns:
-                df["Matricule"] = df["Matricule"].astype(str).str.strip()
-                agent = df[df["Matricule"].str.lower() == str(matricule).strip().lower()]
-                if not agent.empty:
-                    data = agent.iloc[0]
-                    def fmt_date(val):
-                        return pd.to_datetime(val).strftime("%Y-%m-%d") if pd.notnull(val) and str(val) != "NaT" and str(val).strip() != "" else ""
+        # رابط ملف Google Sheets مع استخراج الصفحة الأولى مباشرة بصيغة CSV
+        sheet_url = "https://docs.google.com/spreadsheets/d/1YL34Kw2fPXavwD7WXsFnGpf2NJsr3N40/export?format=csv&gid=0"
+        
+        # قراءة البيانات مع تحديد الترويسة في السطر السابع (header=6)
+        df = pd.read_csv(sheet_url, header=6)
+        
+        # تنظيف الأعمدة والبحث عن Matricule
+        df.columns = [str(c).strip() for c in df.columns]
+        if "Matricule" in df.columns:
+            df["Matricule"] = df["Matricule"].astype(str).str.strip()
+            agent = df[df["Matricule"].str.lower() == str(matricule).strip().lower()]
+            
+            if not agent.empty:
+                data = agent.iloc[0]
+                def fmt_date(val):
+                    return pd.to_datetime(val).strftime("%Y-%m-%d") if pd.notnull(val) and str(val) != "NaT" and str(val).strip() != "" else ""
 
-                    ligne_site_val = next((str(data[c]).strip() for c in df.columns if ("ligne" in c.lower() or "site" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
-                    engin_val = next((str(data[c]).strip() for c in df.columns if ("engin" in c.lower() or "materiel" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                ligne_site_val = next((str(data[c]).strip() for c in df.columns if ("ligne" in c.lower() or "site" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                engin_val = next((str(data[c]).strip() for c in df.columns if ("engin" in c.lower() or "materiel" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
 
-                    return {
-                        "Date_Autorisation": fmt_date(data.get("Date d'autorisation")),
-                        "Examen_Medical": fmt_date(data.get("Date prochaine VM", data.get("Dernière  VM", ""))),
-                        "Examen_Psychotechnique": fmt_date(data.get("Date prochaine  Psy", data.get("Dernier Psy", ""))),
-                        "Examen_Professionnel": fmt_date(data.get("Date prochaine évaluation", data.get("Dernière évaluation", ""))),
-                        "Engin": engin_val,
-                        "Ligne_Site": ligne_site_val,
-                    }
-    except Exception:
-        pass
+                return {
+                    "Date_Autorisation": fmt_date(data.get("Date d'autorisation")),
+                    "Examen_Medical": fmt_date(data.get("Date prochaine VM", data.get("Dernière  VM", ""))),
+                    "Examen_Psychotechnique": fmt_date(data.get("Date prochaine  Psy", data.get("Dernier Psy", ""))),
+                    "Examen_Professionnel": fmt_date(data.get("Date prochaine évaluation", data.get("Dernière évaluation", ""))),
+                    "Engin": engin_val,
+                    "Ligne_Site": ligne_site_val,
+                }
+    except Exception as e:
+        st.error(f"خطأ في قراءة بيانات Google Sheets: {e}")
     return {}
 
 def determine_template_and_mapping(fonction):
