@@ -221,59 +221,63 @@ def get_official_agent_info(matricule):
     return None
 
 @st.cache_data(ttl=60)
+@st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule):
     try:
         req = urllib.request.Request(GOOGLE_SHEET_URL, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
             content = response.read().decode('utf-8')
             
-        reader = csv.DictReader(io.StringIO(content))
-        for row in reader:
-            cleaned_row = {str(k).strip().lower(): (str(v).strip() if v else "") for k, v in row.items() if k}
+        reader = csv.reader(io.StringIO(content))
+        rows = list(reader)
+        if not rows:
+            return {}
             
-            mle_val = ""
-            for k, v in cleaned_row.items():
-                if "matricule" in k or k == "mle":
-                    mle_val = v
-                    break
+        # البحث عن رأس الجدول أو قراءة الصفوف مباشرة
+        header = [str(c).strip().lower() for c in rows[0]]
+        
+        # إيجاد مكان عمود الماتريكول
+        mle_idx = -1
+        for i, h in enumerate(header):
+            if "matricule" in h or "mle" in h:
+                mle_idx = i
+                break
+        
+        if mle_idx == -1:
+            mle_idx = 1 # افتراضي حسب الصورة العمود الثاني
+            
+        for row in rows[1:]:
+            if len(row) <= mle_idx:
+                continue
+            mle_val = str(row[mle_idx]).strip()
             
             if mle_val.lower() == str(matricule).strip().lower():
                 def fmt_date(val):
-                    if val and val.lower() != "nan" and val != "NaT" and val != "":
+                    if val and str(val).lower() not in ["nan", "nat", ""]:
                         parsed_date = pd.to_datetime(val, errors='coerce')
                         if pd.notnull(parsed_date):
                             return parsed_date.strftime("%Y-%m-%d")
-                        return val
+                        return str(val).strip()
                     return ""
 
-                dt_auth, dt_med, dt_psy, dt_prof, engin_val, ligne_site_val = "", "", "", "", "", ""
+                # استخراج القيم بناءً على الأعمدة الظاهرة في الصورة (الترتيب التقريبي)
+                # رتبة الأعمدة حسب الصورة: Nom/Prénom, Matricule, Résidence, Date d'autorisation, Validité, Date d'expiration ...
+                dt_auth = fmt_date(row[3]) if len(row) > 3 else ""
+                dt_prof = ""
+                dt_med = fmt_date(row[5]) if len(row) > 5 else ""
+                dt_psy = ""
                 
-                for k, v in cleaned_row.items():
-                    if any(term in k for term in ["autorisation", "d'autorisation"]) and not dt_auth:
-                        dt_auth = fmt_date(v)
-                    elif any(term in k for term in ["vm", "médical", "medical", "prochaine vm", "dernière vm"]) and not dt_med:
-                        dt_med = fmt_date(v)
-                    elif any(term in k for term in ["psy", "psychotechnique"]) and not dt_psy:
-                        dt_psy = fmt_date(v)
-                    elif any(term in k for term in ["évaluation", "evaluation", "professionnel"]) and not dt_prof:
-                        dt_prof = fmt_date(v)
-                    elif any(term in k for term in ["engin", "materiel", "matériel"]) and v and not engin_val:
-                        engin_val = v
-                    elif any(term in k for term in ["ligne", "site"]) and v and not ligne_site_val:
-                        ligne_site_val = v
-
-                return {
-                    "Date_Autorisation": dt_auth,
-                    "Examen_Medical": dt_med,
-                    "Examen_Psychotechnique": dt_psy,
-                    "Examen_Professionnel": dt_prof,
-                    "Engin": engin_val,
-                    "Ligne_Site": ligne_site_val,
-                }
-    except Exception as e:
-        st.error(f"Erreur Google Sheets: {e}")
-    return {}
-
+                # بحث عام في الصف عن أي تواريخ صالحة إذا لم تطابق الأعمدة بدقة
+                for cell in row:
+                    cell_str = str(cell).strip()
+                    if "/" in cell_str and len(cell_str) == 10: # شكل التاريخ DD/MM/YYYY
+                        parsed = pd.to_datetime(cell_str, errors='coerce', dayfirst=True)
+                        if pd.notnull(parsed):
+                            formatted = parsed.strftime("%Y-%m-%d")
+                            if not dt_med:
+                                dt_med = formatted
+                            elif not dt_auth:
+    ...
 def determine_template_and_mapping(fonction):
     f_lower = fonction.lower().strip()
     if "manœuvre" in f_lower or "manoeuvre" in f_lower or "crmv" in f_lower:
