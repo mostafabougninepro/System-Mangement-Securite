@@ -223,58 +223,49 @@ def get_official_agent_info(matricule):
 @st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule):
     try:
-        # تحويل رابط الشيت إلى رابط تحميل مباشر بصيغة إكسل ليشمل جميع الصفحات
-        base_url = GOOGLE_SHEET_URL.split('/edit')[0].split('/pub')[0]
-        excel_url = f"{base_url}/export?format=xlsx"
-        
-        # قراءة جميع الصفحات في الملف
-        xls = pd.ExcelFile(excel_url)
-        
-        for sheet_name in xls.sheet_names:
-            df = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+        # استعمل رابط الـ CSV المباشر الخاص بك
+        req = urllib.request.Request(GOOGLE_SHEET_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            content = response.read().decode('utf-8')
             
-            # البحث عن الصف الذي يحتوي على Matricule في هذه الصفحة
-            for idx, row in df.iterrows():
-                row_str_list = [str(val).strip().lower() for val in row.values]
+        reader = csv.reader(io.StringIO(content))
+        for row in reader:
+            # نبحث في كل خانات السطر عن رقم الماتريكول مباشرة
+            row_str = [str(cell).strip() for cell in row]
+            if any(str(matricule).strip().lower() in cell.lower() for cell in row_str):
                 
-                # فحص هل هذا السطر أو الأسطر المجاورة تحتوي على الماتريكول المطلوب
-                for col_idx, val in enumerate(row.values):
-                    if str(val).strip().lower() == str(matricule).strip().lower():
-                        # وجدنا الماتريكول! لنبحث في نفس السطر عن التواريخ
-                        def fmt_date(cell_val):
-                            if pd.notnull(cell_val) and str(cell_val).strip() not in ["nan", "NaT", "", "néant"]:
-                                parsed_date = pd.to_datetime(cell_val, errors='coerce', dayfirst=True)
-                                if pd.notnull(parsed_date):
-                                    return parsed_date.strftime("%Y-%m-%d")
-                                return str(cell_val).strip()
-                            return ""
-                        
-                        dt_auth, dt_med, dt_site = "", "", ""
-                        
-                        # استخراج التواريخ من الخلايا المجاورة في نفس السطر
-                        for cell in row.values:
-                            cell_str = str(cell).strip()
-                            if "/" in cell_str or "-" in cell_str:
-                                formatted = fmt_date(cell)
-                                if formatted:
-                                    if not dt_auth:
-                                        dt_auth = formatted
-                                    elif not dt_med:
-                                        dt_med = formatted
-                            elif "kénitra" in cell_str.lower() or "site" in cell_str.lower():
-                                dt_site = cell_str
+                def fmt_date(val):
+                    if val and str(val).lower() not in ["nan", "nat", "", "néant"]:
+                        parsed_date = pd.to_datetime(val, errors='coerce', dayfirst=True)
+                        if pd.notnull(parsed_date):
+                            return parsed_date.strftime("%Y-%m-%d")
+                        return str(val).strip()
+                    return ""
 
-                        return {
-                            "Date_Autorisation": dt_auth,
-                            "Examen_Medical": dt_med,
-                            "Examen_Psychotechnique": "",
-                            "Examen_Professionnel": "",
-                            "Engin": "",
-                            "Ligne_Site": dt_site,
-                        }
+                # استخراج أي تواريخ متواجدة في نفس السطر للموظف
+                dates_found = []
+                for cell in row:
+                    cell_str = str(cell).strip()
+                    if "/" in cell_str and len(cell_str) == 10:
+                        parsed = pd.to_datetime(cell_str, errors='coerce', dayfirst=True)
+                        if pd.notnull(parsed):
+                            dates_found.append(parsed.strftime("%Y-%m-%d"))
+
+                dt_auth = dates_found[0] if len(dates_found) > 0 else ""
+                dt_med = dates_found[1] if len(dates_found) > 1 else (dates_found[0] if len(dates_found) > 0 else "")
+                
+                ligne_site_val = next((c for c in row_str if "kénitra" in c.lower() or "site" in c.lower()), "")
+
+                return {
+                    "Date_Autorisation": dt_auth,
+                    "Examen_Medical": dt_med,
+                    "Examen_Psychotechnique": "",
+                    "Examen_Professionnel": "",
+                    "Engin": "",
+                    "Ligne_Site": ligne_site_val,
+                }
     except Exception as e:
-        # طريقة بديلة في حال فشل التحميل المباشر للإكسل
-        pass
+        st.error(f"Erreur: {e}")
     return {}
     
 def determine_template_and_mapping(fonction):
