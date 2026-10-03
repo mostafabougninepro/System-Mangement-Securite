@@ -232,56 +232,67 @@ def get_agent_dates_and_details(matricule):
         if not rows:
             return {}
             
-        header = [str(c).strip().lower() for c in rows[0]]
+        # البحث التلقائي عن رأس الجدول (الذي يحتوي على Matricule) في أول 10 أسطر
+        header_idx = -1
+        mle_col_idx = 1
+        date_auth_idx = -1
+        date_exp_idx = -1
         
-        mle_idx = -1
-        for i, h in enumerate(header):
-            if "matricule" in h or "mle" in h:
-                mle_idx = i
-                break
-        
-        if mle_idx == -1:
-            mle_idx = 1
-            
-        for row in rows[1:]:
-            if len(row) <= mle_idx:
+        for idx, row in enumerate(rows[:10]):
+            row_lower = [str(c).strip().lower() for c in row]
+            for col_i, val in enumerate(row_lower):
+                if "matricule" in val or val == "mle":
+                    header_idx = idx
+                    mle_col_idx = col_i
+                elif "autorisation" in val:
+                    date_auth_idx = col_i
+                elif "expiration" in val or "validité" in val:
+                    if date_exp_idx == -1:
+                        date_exp_idx = col_i
+                        
+        if header_idx == -1:
+            header_idx = 6  # القيمة الافتراضية بناءً على تصميم جدولك
+
+        # قراءة البيانات بدءاً من السطر الذي يلي رأس الجدول
+        start_row = header_idx + 1 if header_idx != -1 else 7
+        for row in rows[start_row:]:
+            if len(row) <= mle_col_idx:
                 continue
-            mle_val = str(row[mle_idx]).strip()
+            mle_val = str(row[mle_col_idx]).strip()
             
             if mle_val.lower() == str(matricule).strip().lower():
                 def fmt_date(val):
-                    if val and str(val).lower() not in ["nan", "nat", ""]:
-                        parsed_date = pd.to_datetime(val, errors='coerce')
+                    if val and str(val).lower() not in ["nan", "nat", "", "néant"]:
+                        parsed_date = pd.to_datetime(val, errors='coerce', dayfirst=True)
                         if pd.notnull(parsed_date):
                             return parsed_date.strftime("%Y-%m-%d")
                         return str(val).strip()
                     return ""
 
-                dt_auth = fmt_date(row[3]) if len(row) > 3 else ""
-                dt_med = fmt_date(row[5]) if len(row) > 5 else ""
-                dt_prof = ""
-                dt_psy = ""
+                dt_auth = fmt_date(row[date_auth_idx]) if date_auth_idx != -1 and len(row) > date_auth_idx else ""
+                dt_exp = fmt_date(row[date_exp_idx]) if date_exp_idx != -1 and len(row) > date_exp_idx else ""
                 
+                # فحص خلايا الصف لاستخراج أي تواريخ إضافية إن وجدت
+                dt_med = dt_exp
                 for cell in row:
                     cell_str = str(cell).strip()
                     if "/" in cell_str and len(cell_str) == 10:
                         parsed = pd.to_datetime(cell_str, errors='coerce', dayfirst=True)
                         if pd.notnull(parsed):
                             formatted = parsed.strftime("%Y-%m-%d")
-                            if not dt_med:
-                                dt_med = formatted
-                            elif not dt_auth:
+                            if not dt_auth:
                                 dt_auth = formatted
+                            elif not dt_med:
+                                dt_med = formatted
 
                 ligne_site_val = next((str(c).strip() for c in row if "kénitra" in str(c).lower() or "site" in str(c).lower()), "")
-                engin_val = ""
 
                 return {
                     "Date_Autorisation": dt_auth,
                     "Examen_Medical": dt_med,
-                    "Examen_Psychotechnique": dt_psy,
-                    "Examen_Professionnel": dt_prof,
-                    "Engin": engin_val,
+                    "Examen_Psychotechnique": "",
+                    "Examen_Professionnel": "",
+                    "Engin": "",
                     "Ligne_Site": ligne_site_val,
                 }
     except Exception as e:
