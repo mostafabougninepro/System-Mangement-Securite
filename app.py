@@ -223,80 +223,58 @@ def get_official_agent_info(matricule):
 @st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule):
     try:
-        req = urllib.request.Request(GOOGLE_SHEET_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
-            content = response.read().decode('utf-8')
-            
-        reader = csv.reader(io.StringIO(content))
-        rows = list(reader)
-        if not rows:
-            return {}
-            
-        # البحث التلقائي عن رأس الجدول (الذي يحتوي على Matricule) في أول 10 أسطر
-        header_idx = -1
-        mle_col_idx = 1
-        date_auth_idx = -1
-        date_exp_idx = -1
+        # تحويل رابط الشيت إلى رابط تحميل مباشر بصيغة إكسل ليشمل جميع الصفحات
+        base_url = GOOGLE_SHEET_URL.split('/edit')[0].split('/pub')[0]
+        excel_url = f"{base_url}/export?format=xlsx"
         
-        for idx, row in enumerate(rows[:10]):
-            row_lower = [str(c).strip().lower() for c in row]
-            for col_i, val in enumerate(row_lower):
-                if "matricule" in val or val == "mle":
-                    header_idx = idx
-                    mle_col_idx = col_i
-                elif "autorisation" in val:
-                    date_auth_idx = col_i
-                elif "expiration" in val or "validité" in val:
-                    if date_exp_idx == -1:
-                        date_exp_idx = col_i
-                        
-        if header_idx == -1:
-            header_idx = 6  # القيمة الافتراضية بناءً على تصميم جدولك
-
-        # قراءة البيانات بدءاً من السطر الذي يلي رأس الجدول
-        start_row = header_idx + 1 if header_idx != -1 else 7
-        for row in rows[start_row:]:
-            if len(row) <= mle_col_idx:
-                continue
-            mle_val = str(row[mle_col_idx]).strip()
+        # قراءة جميع الصفحات في الملف
+        xls = pd.ExcelFile(excel_url)
+        
+        for sheet_name in xls.sheet_names:
+            df = pd.read_excel(xls, sheet_name=sheet_name, header=None)
             
-            if mle_val.lower() == str(matricule).strip().lower():
-                def fmt_date(val):
-                    if val and str(val).lower() not in ["nan", "nat", "", "néant"]:
-                        parsed_date = pd.to_datetime(val, errors='coerce', dayfirst=True)
-                        if pd.notnull(parsed_date):
-                            return parsed_date.strftime("%Y-%m-%d")
-                        return str(val).strip()
-                    return ""
-
-                dt_auth = fmt_date(row[date_auth_idx]) if date_auth_idx != -1 and len(row) > date_auth_idx else ""
-                dt_exp = fmt_date(row[date_exp_idx]) if date_exp_idx != -1 and len(row) > date_exp_idx else ""
+            # البحث عن الصف الذي يحتوي على Matricule في هذه الصفحة
+            for idx, row in df.iterrows():
+                row_str_list = [str(val).strip().lower() for val in row.values]
                 
-                # فحص خلايا الصف لاستخراج أي تواريخ إضافية إن وجدت
-                dt_med = dt_exp
-                for cell in row:
-                    cell_str = str(cell).strip()
-                    if "/" in cell_str and len(cell_str) == 10:
-                        parsed = pd.to_datetime(cell_str, errors='coerce', dayfirst=True)
-                        if pd.notnull(parsed):
-                            formatted = parsed.strftime("%Y-%m-%d")
-                            if not dt_auth:
-                                dt_auth = formatted
-                            elif not dt_med:
-                                dt_med = formatted
+                # فحص هل هذا السطر أو الأسطر المجاورة تحتوي على الماتريكول المطلوب
+                for col_idx, val in enumerate(row.values):
+                    if str(val).strip().lower() == str(matricule).strip().lower():
+                        # وجدنا الماتريكول! لنبحث في نفس السطر عن التواريخ
+                        def fmt_date(cell_val):
+                            if pd.notnull(cell_val) and str(cell_val).strip() not in ["nan", "NaT", "", "néant"]:
+                                parsed_date = pd.to_datetime(cell_val, errors='coerce', dayfirst=True)
+                                if pd.notnull(parsed_date):
+                                    return parsed_date.strftime("%Y-%m-%d")
+                                return str(cell_val).strip()
+                            return ""
+                        
+                        dt_auth, dt_med, dt_site = "", "", ""
+                        
+                        # استخراج التواريخ من الخلايا المجاورة في نفس السطر
+                        for cell in row.values:
+                            cell_str = str(cell).strip()
+                            if "/" in cell_str or "-" in cell_str:
+                                formatted = fmt_date(cell)
+                                if formatted:
+                                    if not dt_auth:
+                                        dt_auth = formatted
+                                    elif not dt_med:
+                                        dt_med = formatted
+                            elif "kénitra" in cell_str.lower() or "site" in cell_str.lower():
+                                dt_site = cell_str
 
-                ligne_site_val = next((str(c).strip() for c in row if "kénitra" in str(c).lower() or "site" in str(c).lower()), "")
-
-                return {
-                    "Date_Autorisation": dt_auth,
-                    "Examen_Medical": dt_med,
-                    "Examen_Psychotechnique": "",
-                    "Examen_Professionnel": "",
-                    "Engin": "",
-                    "Ligne_Site": ligne_site_val,
-                }
+                        return {
+                            "Date_Autorisation": dt_auth,
+                            "Examen_Medical": dt_med,
+                            "Examen_Psychotechnique": "",
+                            "Examen_Professionnel": "",
+                            "Engin": "",
+                            "Ligne_Site": dt_site,
+                        }
     except Exception as e:
-        st.error(f"Erreur Google Sheets: {e}")
+        # طريقة بديلة في حال فشل التحميل المباشر للإكسل
+        pass
     return {}
     
 def determine_template_and_mapping(fonction):
