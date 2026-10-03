@@ -223,45 +223,44 @@ def get_official_agent_info(matricule):
 @st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule):
     try:
-        # استعمل رابط الـ CSV المباشر الخاص بك
         req = urllib.request.Request(GOOGLE_SHEET_URL, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
             content = response.read().decode('utf-8')
             
         reader = csv.reader(io.StringIO(content))
         for row in reader:
-            # نبحث في كل خانات السطر عن رقم الماتريكول مباشرة
             row_str = [str(cell).strip() for cell in row]
             if any(str(matricule).strip().lower() in cell.lower() for cell in row_str):
                 
-                def fmt_date(val):
-                    if val and str(val).lower() not in ["nan", "nat", "", "néant"]:
-                        parsed_date = pd.to_datetime(val, errors='coerce', dayfirst=True)
-                        if pd.notnull(parsed_date):
-                            return parsed_date.strftime("%Y-%m-%d")
-                        return str(val).strip()
-                    return ""
-
-                # استخراج أي تواريخ متواجدة في نفس السطر للموظف
-                dates_found = []
+                # Jm3 ga3 les dates li kaynin f had l'ligne b ay format kan (DD/MM/YYYY wla YYYY-MM-DD)
+                found_dates = []
                 for cell in row:
                     cell_str = str(cell).strip()
-                    if "/" in cell_str and len(cell_str) == 10:
+                    # Ila kan fih / wla - w fih 8 tal 10 caractères (tarikh)
+                    if ("/" in cell_str or "-" in cell_str) and len(cell_str) >= 8:
                         parsed = pd.to_datetime(cell_str, errors='coerce', dayfirst=True)
                         if pd.notnull(parsed):
-                            dates_found.append(parsed.strftime("%Y-%m-%d"))
+                            found_dates.append(parsed.strftime("%Y-%m-%d"))
 
-                dt_auth = dates_found[0] if len(dates_found) > 0 else ""
-                dt_med = dates_found[1] if len(dates_found) > 1 else (dates_found[0] if len(dates_found) > 0 else "")
+                # Nuz3o les dates 3la les champs
+                dt_auth = found_dates[0] if len(found_dates) > 0 else ""
+                dt_med = found_dates[1] if len(found_dates) > 1 else dt_auth
                 
                 ligne_site_val = next((c for c in row_str if "kénitra" in c.lower() or "site" in c.lower()), "")
+                
+                # N9lbo 3la les engins wla l'lignes f l'ligne
+                engin_val = ""
+                for c in row_str:
+                    if any(e in c.upper() for e in ["E1450", "E1400", "Z2M", "DH400", "E1250"]):
+                        engin_val = c
+                        break
 
                 return {
                     "Date_Autorisation": dt_auth,
                     "Examen_Medical": dt_med,
                     "Examen_Psychotechnique": "",
                     "Examen_Professionnel": "",
-                    "Engin": "",
+                    "Engin": engin_val,
                     "Ligne_Site": ligne_site_val,
                 }
     except Exception as e:
