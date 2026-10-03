@@ -55,7 +55,7 @@ PHOTOS_ZIP = os.path.join(BASE_DIR, "photos all.zip")
 EXTRACTED_PHOTOS_DIR = os.path.join(BASE_DIR, "_extracted_photos")
 
 # رابط Google Sheets بصيغة التصدير المباشر CSV
-GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1YL34Kw2fPXavwD7WXsFnGpf2NJsr3N40/export?format=csv&gid=0"
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz_31fa5jVtp2XvGWj3-HdKubKsG3AH2po3XSFJ8ZdKQs1f0nHRcgHG9Ah4zaziQ/pub?output=csv"
 
 # ================= ================= =================
 # 1. BASE DE DONNEES UTILISATEURS
