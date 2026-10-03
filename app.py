@@ -123,7 +123,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-st.sidebar.markdown("### 🏛️️ Navigation")
+st.sidebar.markdown("### 🏛 Navigation")
 if st.session_state["user_role"] == "Admin":
     menu = st.sidebar.radio("Module actif :", ["🪪 Cartes d'Habilitation", "👥 Gestion des Accès"])
 else:
@@ -222,7 +222,7 @@ def get_official_agent_info(matricule):
 @st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule):
     try:
-        df = pd.read_csv(GOOGLE_SHEET_URL, header=6)
+        df = pd.read_csv(GOOGLE_SHEET_URL, header=0) # تأكد من تغيير header إلى 0 إذا كان جدولك يبدأ من السطر الأول
         df.columns = [str(c).strip() for c in df.columns]
         if "Matricule" in df.columns:
             df["Matricule"] = df["Matricule"].astype(str).str.strip()
@@ -242,8 +242,8 @@ def get_agent_dates_and_details(matricule):
 
                 return {
                     "Date_Autorisation": fmt_date(data.get("Date d'autorisation")),
-                    "Examen_Medical": fmt_date(data.get("Date prochaine VM", data.get("Dernière  VM", ""))),
-                    "Examen_Psychotechnique": fmt_date(data.get("Date prochaine  Psy", data.get("Dernier Psy", ""))),
+                    "Examen_Medical": fmt_date(data.get("Date prochaine VM", data.get("Dernière VM", ""))),
+                    "Examen_Psychotechnique": fmt_date(data.get("Date prochaine Psy", data.get("Dernier Psy", ""))),
                     "Examen_Professionnel": fmt_date(data.get("Date prochaine évaluation", data.get("Dernière évaluation", ""))),
                     "Engin": engin_val,
                     "Ligne_Site": ligne_site_val,
@@ -257,11 +257,11 @@ def determine_template_and_mapping(fonction):
     if "manœuvre" in f_lower or "manoeuvre" in f_lower or "crmv" in f_lower:
         keyword = "crmv"
         default_eng = "E1450 , E1400 , Z2M , DH400 , DH350 , DM600"
-        default_sit = "  Site Voyageurs Kénitra "
+        default_sit = " Site Voyageurs Kénitra "
     elif "formation" in f_lower or "cft" in f_lower:
         keyword = "cft"
         default_eng = "E1450 , E1400 , E1250 , Z2M , DH400 , DM600"
-        default_sit = "  Site Voyageurs Kénitra "
+        default_sit = " Site Voyageurs Kénitra "
     elif "ligne" in f_lower or "cl" in f_lower:
         keyword = "cl"
         default_eng = "E1450 , E1400 , Z2M"
@@ -344,7 +344,7 @@ with col2:
     dt_psycho = st.text_input("Date d'expiration de l'examen psycho", key="dt_psy")
 
 lignes_sites = st.text_input("Autorisé aux lignes suivantes", key="lignes")
-materiel_locos = st.text_input("Autorisé à arrêter ou Autorisé à conduire", key="engins")
+materiel_locos = st.text_input("Autorisé à arrêter أو Autorisé à conduire", key="engins")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -362,7 +362,6 @@ def generate_custom_excel():
     wb = openpyxl.load_workbook(tmpl_path)
     sheet = wb.active
 
-    # Injection precise fel cellules b dbt
     sheet["E6"] = nom_input
     sheet["J6"] = prenom_input
     sheet["E7"] = matricule_input
@@ -371,7 +370,6 @@ def generate_custom_excel():
     sheet["G12"] = dt_medical
     sheet["G13"] = dt_psycho
 
-    # L5:L11 w M5:M11 b wrap text w alignment
     sheet["L5"] = materiel_locos
     sheet["L5"].alignment = openpyxl.styles.Alignment(wrap_text=True, vertical="center", horizontal="center")
 
