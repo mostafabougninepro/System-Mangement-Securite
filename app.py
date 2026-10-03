@@ -223,32 +223,50 @@ def get_official_agent_info(matricule):
 @st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule):
     try:
-        # قراءة Google Sheets مباشرة باستخدام pandas.read_csv مع تجاهل الأخطاء
-        df = pd.read_csv(GOOGLE_SHEET_URL)
-        df.columns = [str(c).strip() for c in df.columns]
-        
-        mle_col = next((c for c in df.columns if "matricule" in c.lower() or "mle" in c.lower()), None)
-        if mle_col:
-            df[mle_col] = df[mle_col].astype(str).str.strip()
-            agent = df[df[mle_col].str.lower() == str(matricule).strip().lower()]
-            if not agent.empty:
-                data = agent.iloc[0]
+        req = urllib.request.Request(GOOGLE_SHEET_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            content = response.read().decode('utf-8')
+            
+        reader = csv.DictReader(io.StringIO(content))
+        for row in reader:
+            cleaned_row = {str(k).strip().lower(): (str(v).strip() if v else "") for k, v in row.items() if k}
+            
+            mle_val = ""
+            for k, v in cleaned_row.items():
+                if "matricule" in k or k == "mle":
+                    mle_val = v
+                    break
+            
+            if mle_val.lower() == str(matricule).strip().lower():
                 def fmt_date(val):
-                    if pd.notnull(val) and str(val) != "NaT" and str(val).strip() != "":
+                    if val and val.lower() != "nan" and val != "NaT" and val != "":
                         parsed_date = pd.to_datetime(val, errors='coerce')
                         if pd.notnull(parsed_date):
                             return parsed_date.strftime("%Y-%m-%d")
-                        return str(val).strip()
+                        return val
                     return ""
 
-                ligne_site_val = next((str(data[c]).strip() for c in df.columns if ("ligne" in c.lower() or "site" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
-                engin_val = next((str(data[c]).strip() for c in df.columns if ("engin" in c.lower() or "materiel" in c.lower()) and pd.notnull(data[c]) and str(data[c]).lower() != "nan"), "")
+                dt_auth, dt_med, dt_psy, dt_prof, engin_val, ligne_site_val = "", "", "", "", "", ""
+                
+                for k, v in cleaned_row.items():
+                    if any(term in k for term in ["autorisation", "d'autorisation"]) and not dt_auth:
+                        dt_auth = fmt_date(v)
+                    elif any(term in k for term in ["vm", "médical", "medical", "prochaine vm", "dernière vm"]) and not dt_med:
+                        dt_med = fmt_date(v)
+                    elif any(term in k for term in ["psy", "psychotechnique"]) and not dt_psy:
+                        dt_psy = fmt_date(v)
+                    elif any(term in k for term in ["évaluation", "evaluation", "professionnel"]) and not dt_prof:
+                        dt_prof = fmt_date(v)
+                    elif any(term in k for term in ["engin", "materiel", "matériel"]) and v and not engin_val:
+                        engin_val = v
+                    elif any(term in k for term in ["ligne", "site"]) and v and not ligne_site_val:
+                        ligne_site_val = v
 
                 return {
-                    "Date_Autorisation": fmt_date(data.get("Date d'autorisation")),
-                    "Examen_Medical": fmt_date(data.get("Date prochaine VM", data.get("Dernière VM", ""))),
-                    "Examen_Psychotechnique": fmt_date(data.get("Date prochaine Psy", data.get("Dernier Psy", ""))),
-                    "Examen_Professionnel": fmt_date(data.get("Date prochaine évaluation", data.get("Dernière évaluation", ""))),
+                    "Date_Autorisation": dt_auth,
+                    "Examen_Medical": dt_med,
+                    "Examen_Psychotechnique": dt_psy,
+                    "Examen_Professionnel": dt_prof,
                     "Engin": engin_val,
                     "Ligne_Site": ligne_site_val,
                 }
