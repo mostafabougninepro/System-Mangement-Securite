@@ -183,7 +183,7 @@ def get_agent_photo(matricule):
                 for file_name in files:
                     name_part, _ = os.path.splitext(file_name)
                     if name_part.strip().lower() == target:
-                        return os.path.join(root, file_name), "Photo trouvée dans photos all.zip"
+                        return os.path.join(root, file_name), "Photo trouvée"
         except Exception:
             pass
     return None, "Photo non trouvable"
@@ -202,9 +202,13 @@ def get_official_agent_info(matricule):
                 agent = df[df[mle_col].str.lower() == str(matricule).strip().lower()]
                 if not agent.empty:
                     row = agent.iloc[0]
+                    full_name = str(row.get("Nom /Prénom", row.get("Nom", ""))).strip()
+                    parts = full_name.split()
+                    nom = parts[0] if parts else ""
+                    prenom = " ".join(parts[1:]) if len(parts) > 1 else str(row.get("Prénom", "")).strip()
                     return {
-                        "Nom": str(row.get("Nom", "")).strip() if pd.notnull(row.get("Nom")) else "",
-                        "Prenom": str(row.get("Prénom", "")).strip() if pd.notnull(row.get("Prénom")) else "",
+                        "Nom": nom,
+                        "Prenom": prenom,
                         "Fonction": str(row.get("Fonction", "")).strip() if pd.notnull(row.get("Fonction")) else ""
                     }
     except Exception:
@@ -234,9 +238,9 @@ def get_agent_dates_and_details(matricule):
 
                     return {
                         "Date_Autorisation": fmt_date(data.get("Date d'autorisation")),
-                        "Examen_Medical": fmt_date(data.get("Dernière  VM", data.get("Dernière VM", ""))),
-                        "Examen_Psychotechnique": fmt_date(data.get("Dernier Psy", data.get("Dernière Psy", ""))),
-                        "Examen_Professionnel": fmt_date(data.get("Dernière évaluation", data.get("Dernier Eval", ""))),
+                        "Examen_Medical": fmt_date(data.get("Date prochaine VM", data.get("Dernière  VM", ""))),
+                        "Examen_Psychotechnique": fmt_date(data.get("Date prochaine  Psy", data.get("Dernier Psy", ""))),
+                        "Examen_Professionnel": fmt_date(data.get("Date prochaine évaluation", data.get("Dernière évaluation", ""))),
                         "Engin": engin_val,
                         "Ligne_Site": ligne_site_val,
                     }
@@ -263,7 +267,6 @@ def determine_template_and_mapping(fonction):
         default_eng = "E1450 , E1400 , E1250 , Z2M , DH400"
         default_sit = ""
 
-    # البحث عن اسم الملف المطابق تماماً في المجلد (سواء كان يحتوي على _2 أو نقاط)
     matched_file = keyword + ".xlsx"
     for f in os.listdir(BASE_DIR):
         if f.lower().endswith(".xlsx") and keyword in f.lower():
@@ -274,25 +277,12 @@ def determine_template_and_mapping(fonction):
         "template": matched_file,
         "default_engins": default_eng,
         "default_site": default_sit,
-        "cells": {
-            "fonction": "D4",
-            "nom": "F5",
-            "prenom": "I5",
-            "matricule": "F6",
-            "dt_auth": "F9",
-            "dt_prof": "F10",
-            "dt_med": "F11",
-            "dt_psy": "F12",
-            "engins": "K4",
-            "lignes": "L4",
-            "photo_cell": "B5"
-        }
     }
 
 st.markdown("### 🔍 Recherche & Identification de l'Agent")
 
 st.session_state.setdefault("last_matricule", "")
-matricule_search = st.text_input("Saisir le Matricule de l'agent :", placeholder="Exemple: 47607A")
+matricule_search = st.text_input("Saisir le Matricule de l'agent :", placeholder="Exemple: 42685P")
 
 if matricule_search != st.session_state["last_matricule"]:
     st.session_state["last_matricule"] = matricule_search
@@ -342,26 +332,24 @@ with col1:
     matricule_input = st.text_input("Matricule", key="matricule")
     fonction_input = st.text_input("Fonction (Titre d'habilitation)", key="fonction")
     dt_autorisation = st.text_input("Date d'autorisation", key="dt_auth")
-    dt_medical = st.text_input("Date examen médical", key="dt_med")
+    dt_medical = st.text_input("Date d'expiration de l'examen médical", key="dt_med")
 
 with col2:
     prenom_input = st.text_input("Prénom", key="prenom")
-    dt_professionnel = st.text_input("Date examen professionnel", key="dt_prof")
-    dt_psycho = st.text_input("Date examen psychotechnique", key="dt_psy")
+    dt_professionnel = st.text_input("Date d'expiration de l'examen pro", key="dt_prof")
+    dt_psycho = st.text_input("Date d'expiration de l'examen psycho", key="dt_psy")
 
-lignes_sites = st.text_input("Lignes autorisées", key="lignes")
-materiel_locos = st.text_input("Matériel / Locos / Rames autorisées", key="engins")
+lignes_sites = st.text_input("Autorisé aux lignes suivantes", key="lignes")
+materiel_locos = st.text_input("Autorisé à arrêter ou Autorisé à conduire", key="engins")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
 def generate_custom_excel():
     config = determine_template_and_mapping(fonction_input)
     tmpl_filename = config["template"]
-    cells = config["cells"]
     
     tmpl_path = os.path.join(BASE_DIR, tmpl_filename)
     if not os.path.exists(tmpl_path):
-        # Fallback في حال لم يجد الملف تحديداً
         for f in os.listdir(BASE_DIR):
             if f.endswith(".xlsx") and any(k in f.lower() for k in ["ctr", "cl", "cft", "crmv"]):
                 tmpl_path = os.path.join(BASE_DIR, f)
@@ -370,17 +358,21 @@ def generate_custom_excel():
     wb = openpyxl.load_workbook(tmpl_path)
     sheet = wb.active
 
-    # تعبئة الخلايا بدقة عالية حسب طلبك
-    sheet[cells["fonction"]] = fonction_input
-    sheet[cells["nom"]] = nom_input
-    sheet[cells["prenom"]] = prenom_input
-    sheet[cells["matricule"]] = matricule_input
-    sheet[cells["dt_auth"]] = dt_autorisation
-    sheet[cells["dt_prof"]] = dt_professionnel
-    sheet[cells["dt_med"]] = dt_medical
-    sheet[cells["dt_psy"]] = dt_psycho
-    sheet[cells["engins"]] = materiel_locos
-    sheet[cells["lignes"]] = lignes_sites
+    # Injection precise fel cellules b dbt
+    sheet["E6"] = nom_input
+    sheet["J6"] = prenom_input
+    sheet["E7"] = matricule_input
+    sheet["G10"] = dt_autorisation
+    sheet["G11"] = dt_professionnel
+    sheet["G12"] = dt_medical
+    sheet["G13"] = dt_psycho
+
+    # L5:L11 w M5:M11 b wrap text w alignment
+    sheet["L5"] = materiel_locos
+    sheet["L5"].alignment = openpyxl.styles.Alignment(wrap_text=True, vertical="center", horizontal="center")
+
+    sheet["M5"] = lignes_sites
+    sheet["M5"].alignment = openpyxl.styles.Alignment(wrap_text=True, vertical="center", horizontal="center")
 
     if final_photo_source is not None:
         pil_img = PILImage.open(final_photo_source if isinstance(final_photo_source, str) else io.BytesIO(final_photo_source.read()))
@@ -392,7 +384,7 @@ def generate_custom_excel():
 
         xl_img = OpenpyxlImage(img_temp_path)
         xl_img.width, xl_img.height = target_w, target_h
-        sheet.add_image(xl_img, cells["photo_cell"])
+        sheet.add_image(xl_img, "B5")
 
     output = io.BytesIO()
     wb.save(output)
@@ -412,4 +404,3 @@ if st.button("⚡ Générer la Carte d'Habilitation", use_container_width=True):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
-
