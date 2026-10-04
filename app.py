@@ -221,7 +221,7 @@ def get_official_agent_info(matricule):
     return None
 
 @st.cache_data(ttl=60)
-def get_agent_dates_and_details(matricule):
+def get_agent_dates_and_details(matricule, page_type="conduite"):
     try:
         req = urllib.request.Request(GOOGLE_SHEET_URL, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
@@ -229,7 +229,6 @@ def get_agent_dates_and_details(matricule):
             
         reader = csv.reader(io.StringIO(content))
         for row in reader:
-            # N9lbo 3la l'matricule f ay 5ana f l'ligne
             row_str = [str(cell).strip() for cell in row]
             if any(str(matricule).strip().lower() in cell.lower() for cell in row_str):
                 
@@ -241,20 +240,22 @@ def get_agent_dates_and_details(matricule):
                         return str(val).strip()
                     return ""
 
-                # Indices 0-based based on column letters:
-                # E = 4 (Date d'autorisation)
-                # N = 13 (Engin)
-                # O = 14 (Ligne / Site)
-                # T = 19 (Date prochaine VM / Examen médical)
-                # Y = 24 (Date prochain Psy)
-                # AB = 27 (Date prochaine évaluation / Examen pro)
-                
-                dt_auth = fmt_date(row[4]) if len(row) > 4 else ""
-                engin_val = str(row[13]).strip() if len(row) > 13 else ""
-                ligne_site_val = str(row[14]).strip() if len(row) > 14 else ""
-                dt_med = fmt_date(row[19]) if len(row) > 19 else ""
-                dt_psy = fmt_date(row[24]) if len(row) > 24 else ""
-                dt_prof = fmt_date(row[27]) if len(row) > 27 else ""
+                if page_type.lower() == "formation":
+                    # مواضع الأعمدة الخاصة بصفحة Formation
+                    dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E
+                    engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
+                    ligne_site_val = str(row[15]).strip() if len(row) > 15 else "" # P
+                    dt_med = fmt_date(row[20]) if len(row) > 20 else ""      # U
+                    dt_psy = fmt_date(row[25]) if len(row) > 25 else ""      # Z
+                    dt_prof = fmt_date(row[28]) if len(row) > 28 else ""     # AC
+                else:
+                    # مواضع الأعمدة الخاصة بصفحة Conduite
+                    dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E
+                    engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
+                    ligne_site_val = str(row[14]).strip() if len(row) > 14 else "" # O
+                    dt_med = fmt_date(row[19]) if len(row) > 19 else ""      # T
+                    dt_psy = fmt_date(row[24]) if len(row) > 24 else ""      # Y
+                    dt_prof = fmt_date(row[27]) if len(row) > 27 else ""     # AB
 
                 return {
                     "Date_Autorisation": dt_auth,
