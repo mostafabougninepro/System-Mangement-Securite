@@ -215,15 +215,20 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                         return str(val).strip()
                     return ""
 
-                dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E
+                # تعديل الأعمدة حسب ترتيب Google Sheet الخاص بك (عادة Nom=2, Prénom=3, Fonction=12...)
+                nom_val = str(row[2]).strip() if len(row) > 2 else ""      # C (Nom)
+                prenom_val = str(row[3]).strip() if len(row) > 3 else ""   # D (Prénom)
+                dt_auth = fmt_date(row[4]) if len(row) > 4 else ""         # E
                 fonction_val = str(row[12]).strip() if len(row) > 12 else "" # M (Fonction)
                 engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
                 ligne_site_val = str(row[14]).strip() if len(row) > 14 else "" # O
-                dt_med = fmt_date(row[19]) if len(row) > 19 else ""      # T
-                dt_psy = fmt_date(row[24]) if len(row) > 24 else ""      # Y
-                dt_prof = fmt_date(row[27]) if len(row) > 27 else ""     # AB
+                dt_med = fmt_date(row[19]) if len(row) > 19 else ""        # T
+                dt_psy = fmt_date(row[24]) if len(row) > 24 else ""        # Y
+                dt_prof = fmt_date(row[27]) if len(row) > 27 else ""       # AB
 
                 return {
+                    "Nom": nom_val,
+                    "Prenom": prenom_val,
                     "Fonction": fonction_val,
                     "Date_Autorisation": dt_auth,
                     "Examen_Medical": dt_med,
@@ -288,8 +293,8 @@ if matricule_search != st.session_state["last_matricule"] or selected_page != st
     dates_info = get_agent_dates_and_details(matricule_search, page_type=selected_page) if matricule_search else {}
 
     st.session_state["matricule"] = matricule_search
-    st.session_state["nom"] = ""
-    st.session_state["prenom"] = ""
+    st.session_state["nom"] = dates_info.get("Nom", "")
+    st.session_state["prenom"] = dates_info.get("Prenom", "")
     st.session_state["fonction"] = dates_info.get("Fonction", "Chef de Train" if selected_page == "Conduite" else "Chef Formation Trains")
 
     config_info = determine_template_and_mapping(st.session_state["fonction"])
@@ -385,7 +390,6 @@ if st.button("⚡ Générer la Carte d'Habilitation", use_container_width=True):
     excel_file = generate_custom_excel()
     config = determine_template_and_mapping(fonction_input)
     card_type_prefix = config["keyword"]
-    # استخدام المسافة العادية بدون تعويض بـ Underscore في اسم العائلة
     clean_nom = " ".join(nom_input.strip().upper().split()) if nom_input.strip() else "AGENT"
     file_download_name = f"Carte_{card_type_prefix}_{clean_nom}.xlsx"
 
