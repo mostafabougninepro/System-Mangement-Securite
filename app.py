@@ -229,37 +229,38 @@ def get_agent_dates_and_details(matricule):
             
         reader = csv.reader(io.StringIO(content))
         for row in reader:
+            # N9lbo 3la l'matricule f ay 5ana f l'ligne
             row_str = [str(cell).strip() for cell in row]
             if any(str(matricule).strip().lower() in cell.lower() for cell in row_str):
                 
-                # Jm3 ga3 les dates li kaynin f had l'ligne b ay format kan (DD/MM/YYYY wla YYYY-MM-DD)
-                found_dates = []
-                for cell in row:
-                    cell_str = str(cell).strip()
-                    # Ila kan fih / wla - w fih 8 tal 10 caractères (tarikh)
-                    if ("/" in cell_str or "-" in cell_str) and len(cell_str) >= 8:
-                        parsed = pd.to_datetime(cell_str, errors='coerce', dayfirst=True)
-                        if pd.notnull(parsed):
-                            found_dates.append(parsed.strftime("%Y-%m-%d"))
+                def fmt_date(val):
+                    if val and str(val).lower() not in ["nan", "nat", "", "néant", "None"]:
+                        parsed_date = pd.to_datetime(val, errors='coerce', dayfirst=True)
+                        if pd.notnull(parsed_date):
+                            return parsed_date.strftime("%Y-%m-%d")
+                        return str(val).strip()
+                    return ""
 
-                # Nuz3o les dates 3la les champs
-                dt_auth = found_dates[0] if len(found_dates) > 0 else ""
-                dt_med = found_dates[1] if len(found_dates) > 1 else dt_auth
+                # Indices 0-based based on column letters:
+                # E = 4 (Date d'autorisation)
+                # N = 13 (Engin)
+                # O = 14 (Ligne / Site)
+                # T = 19 (Date prochaine VM / Examen médical)
+                # Y = 24 (Date prochain Psy)
+                # AB = 27 (Date prochaine évaluation / Examen pro)
                 
-                ligne_site_val = next((c for c in row_str if "kénitra" in c.lower() or "site" in c.lower()), "")
-                
-                # N9lbo 3la les engins wla l'lignes f l'ligne
-                engin_val = ""
-                for c in row_str:
-                    if any(e in c.upper() for e in ["E1450", "E1400", "Z2M", "DH400", "E1250"]):
-                        engin_val = c
-                        break
+                dt_auth = fmt_date(row[4]) if len(row) > 4 else ""
+                engin_val = str(row[13]).strip() if len(row) > 13 else ""
+                ligne_site_val = str(row[14]).strip() if len(row) > 14 else ""
+                dt_med = fmt_date(row[19]) if len(row) > 19 else ""
+                dt_psy = fmt_date(row[24]) if len(row) > 24 else ""
+                dt_prof = fmt_date(row[27]) if len(row) > 27 else ""
 
                 return {
                     "Date_Autorisation": dt_auth,
                     "Examen_Medical": dt_med,
-                    "Examen_Psychotechnique": "",
-                    "Examen_Professionnel": "",
+                    "Examen_Psychotechnique": dt_psy,
+                    "Examen_Professionnel": dt_prof,
                     "Engin": engin_val,
                     "Ligne_Site": ligne_site_val,
                 }
