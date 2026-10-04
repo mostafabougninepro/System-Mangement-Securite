@@ -132,6 +132,33 @@ if st.session_state["user_role"] == "Admin":
 else:
     menu = "🪪 Cartes d'Habilitation"
 
+# ================= ================= =================
+# زر التحديث اليدوي (Mise à jour de registre)
+# ================= ================= =================
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔄 Gestion Registre")
+if st.sidebar.button("Mise à jour de registre", use_container_width=True):
+    try:
+        # تحديث سجل القيادة
+        req_c = urllib.request.Request(GOOGLE_SHEET_CONDUITE_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req_c, timeout=5) as response_c:
+            content_c = response_c.read().decode('utf-8')
+            path_c = os.path.join(BASE_DIR, "registre_conduite.csv")
+            with open(path_c, "w", encoding="utf-8") as f_c:
+                f_c.write(content_c)
+                
+        # تحديث سجل التكوين
+        req_f = urllib.request.Request(GOOGLE_SHEET_FORMATION_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req_f, timeout=5) as response_f:
+            content_f = response_f.read().decode('utf-8')
+            path_f = os.path.join(BASE_DIR, "registre_formation.csv")
+            with open(path_f, "w", encoding="utf-8") as f_f:
+                f_f.write(content_f)
+                
+        st.sidebar.success("✅ Registres mis à jour avec succès !")
+    except Exception as e:
+        st.sidebar.error(f"❌ Échec de la mise à jour: {e}")
+
 st.sidebar.markdown("---")
 if st.sidebar.button("🚪 Déconnexion", use_container_width=True):
     st.session_state["logged_in"] = False
@@ -195,37 +222,13 @@ def get_agent_photo(matricule):
     return None, "Photo non trouvable"
 
 def get_agent_dates_and_details(matricule, page_type="conduite"):
-    is_formation = (page_type.lower() == "formation")
-    target_url = GOOGLE_SHEET_FORMATION_URL if is_formation else GOOGLE_SHEET_CONDUITE_URL
-    
-    # هنا كنحددو أسماء الملفات الأصلية بالضبْط كيفما كاينين في الدوسي ديالك اللي جاب من GitHub
-    original_file_name = "registre_formation.csv" if is_formation else "registre_conduite.csv"
-    local_file_path = os.path.join(BASE_DIR, original_file_name)
-    
-    content = None
-    
-    # 1. محاولة جلب أحدث نسخة من جوجل شيت والكتابة مباشرة فوق الملف الأصلي في الدوسي
     try:
+        target_url = GOOGLE_SHEET_FORMATION_URL if page_type.lower() == "formation" else GOOGLE_SHEET_CONDUITE_URL
+        
         req = urllib.request.Request(target_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req) as response:
             content = response.read().decode('utf-8')
-            # تحديث الملف الأصلي مباشرة في مكانه
-            with open(local_file_path, "w", encoding="utf-8") as f:
-                f.write(content)
-    except Exception:
-        # 2. إذا ماكانتလို့ كونكسيون، التطبيق غادي يقرأ من الملف الأصلي بيدو اللي كاين في الدوسي
-        if os.path.exists(local_file_path):
-            try:
-                with open(local_file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-            except Exception:
-                pass
-                
-    if not content:
-        return {}
-
-    # معالجة البيانات واستخراج المعلومات
-    try:
+            
         reader = csv.reader(io.StringIO(content))
         for row in reader:
             if not row or len(row) <= 2:
@@ -266,8 +269,7 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                     "Ligne_Site": ligne_site_val,
                 }
     except Exception as e:
-        pass
-        
+        st.error(f"Erreur: {e}")
     return {}
     
 def determine_template_and_mapping(fonction):
@@ -401,7 +403,6 @@ def generate_custom_excel():
     if final_photo_source is not None:
         pil_img = PILImage.open(final_photo_source if isinstance(final_photo_source, str) else io.BytesIO(final_photo_source.read()))
         
-        # 🟢 هنا تقدر تبدل الأرقام (الرض والارتفاع) باش تقادها على ذوقك وسط C6, C7, C8
         target_w, target_h = int(2.5 * 37.8), int(3.5 * 37.8)  
         pil_img = pil_img.resize((target_w, target_h), PILImage.Resampling.LANCZOS)
         
@@ -411,7 +412,7 @@ def generate_custom_excel():
         xl_img = OpenpyxlImage(img_temp_path)
         xl_img.width = target_w
         xl_img.height = target_h
-        sheet.add_image(xl_img, "C6")  # الصورة غاتثبت هنا فـ C6 (وسط الكاسيوهات C6, C7, C8)
+        sheet.add_image(xl_img, "C6")
 
     output = io.BytesIO()
     wb.save(output)
