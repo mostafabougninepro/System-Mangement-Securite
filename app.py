@@ -240,22 +240,13 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                         return str(val).strip()
                     return ""
 
-                if page_type.lower() == "formation":
-                    # تعديل وتدقيق إحداثيات أعمدة جدول الـ Formation بدقة حسب Google Sheets
-                    dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E
-                    engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
-                    ligne_site_val = str(row[15]).strip() if len(row) > 15 else "" # P
-                    dt_med = fmt_date(row[20]) if len(row) > 20 else ""      # U
-                    dt_psy = fmt_date(row[25]) if len(row) > 25 else ""      # Z
-                    dt_prof = fmt_date(row[28]) if len(row) > 28 else ""     # AC
-                else:
-                    # إحداثيات أعمدة Conduite الأصلية
-                    dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E
-                    engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
-                    ligne_site_val = str(row[14]).strip() if len(row) > 14 else "" # O
-                    dt_med = fmt_date(row[19]) if len(row) > 19 else ""      # T
-                    dt_psy = fmt_date(row[24]) if len(row) > 24 else ""      # Y
-                    dt_prof = fmt_date(row[27]) if len(row) > 27 else ""     # AB
+                # tstkhdm nafss les indices l jmi3 les types (Conduite w Formation) 3la 7sab la position li 3titini
+                dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E (Date d'autorisation)
+                engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N (Engin)
+                ligne_site_val = str(row[14]).strip() if len(row) > 14 else "" # O (Ligne / Site)
+                dt_med = fmt_date(row[19]) if len(row) > 19 else ""      # T (Date prochaine VM)
+                dt_psy = fmt_date(row[24]) if len(row) > 24 else ""      # Y (Date prochain Psy)
+                dt_prof = fmt_date(row[27]) if len(row) > 27 else ""     # AB (Date prochaine évaluation)
 
                 return {
                     "Date_Autorisation": dt_auth,
