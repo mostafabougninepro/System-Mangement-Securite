@@ -195,13 +195,37 @@ def get_agent_photo(matricule):
     return None, "Photo non trouvable"
 
 def get_agent_dates_and_details(matricule, page_type="conduite"):
+    is_formation = (page_type.lower() == "formation")
+    target_url = GOOGLE_SHEET_FORMATION_URL if is_formation else GOOGLE_SHEET_FORMATION_URL
+    
+    # هنا كنعطيو السمية الحقيقية للملف الأصلي لي بغيتيه يبقى ديما à jour في الدوسيي ديالك
+    original_file_name = "registre_formation.csv" if is_formation else "registre_conduite.csv"
+    local_file_path = os.path.join(BASE_DIR, original_file_name)
+    
+    content = None
+    
+    # 1. محاولة جلب أحدث نسخة من جوجل شيت وتحديث الملف الأصلي مباشرة
     try:
-        target_url = GOOGLE_SHEET_FORMATION_URL if page_type.lower() == "formation" else GOOGLE_SHEET_CONDUITE_URL
-        
         req = urllib.request.Request(target_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=5) as response:
             content = response.read().decode('utf-8')
-            
+            # تحديث الملف الأصلي في الدوسيي بآخر ما كاين في جوجل شيت
+            with open(local_file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+    except Exception:
+        # 2. إذا ماكانتش كونكسيون، التطبيق غادي يقرأ من الملف الأصلي ديالك اللي متساريف ديجا فالدوسيي
+        if os.path.exists(local_file_path):
+            try:
+                with open(local_file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+            except Exception:
+                pass
+                
+    if not content:
+        return {}
+
+    # معالجة البيانات واستخراج معلومات الأجنت
+    try:
         reader = csv.reader(io.StringIO(content))
         for row in reader:
             if not row or len(row) <= 2:
@@ -242,7 +266,8 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                     "Ligne_Site": ligne_site_val,
                 }
     except Exception as e:
-        st.error(f"Erreur: {e}")
+        pass
+        
     return {}
     
 def determine_template_and_mapping(fonction):
