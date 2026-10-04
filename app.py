@@ -241,6 +241,7 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                     return ""
 
                 if page_type.lower() == "formation":
+                    # تعديل وتدقيق إحداثيات أعمدة جدول الـ Formation بدقة حسب Google Sheets
                     dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E
                     engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
                     ligne_site_val = str(row[15]).strip() if len(row) > 15 else "" # P
@@ -248,6 +249,7 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                     dt_psy = fmt_date(row[25]) if len(row) > 25 else ""      # Z
                     dt_prof = fmt_date(row[28]) if len(row) > 28 else ""     # AC
                 else:
+                    # إحداثيات أعمدة Conduite الأصلية
                     dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E
                     engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
                     ligne_site_val = str(row[14]).strip() if len(row) > 14 else "" # O
@@ -303,8 +305,9 @@ st.markdown("### 🔍 Recherche & Identification de l'Agent")
 st.session_state.setdefault("last_matricule", "")
 st.session_state.setdefault("last_page_type", "Conduite")
 
-matricule_search = st.text_input("Saisir le Matricule de l'agent :", placeholder="Exemple: 42685P")
+# جعل اختيار "Type de Registre" في الأعلى ثم يليه "Matricule"
 selected_page = st.selectbox("Type de Registre", ["Conduite", "Formation"])
+matricule_search = st.text_input("Saisir le Matricule de l'agent :", placeholder="Exemple: 42685P")
 
 if matricule_search != st.session_state["last_matricule"] or selected_page != st.session_state["last_page_type"]:
     st.session_state["last_matricule"] = matricule_search
