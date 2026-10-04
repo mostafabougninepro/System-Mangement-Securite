@@ -204,8 +204,12 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
             
         reader = csv.reader(io.StringIO(content))
         for row in reader:
-            row_str = [str(cell).strip() for cell in row]
-            if any(str(matricule).strip().lower() in cell.lower() for cell in row_str):
+            if not row or len(row) <= 2:
+                continue
+            
+            # التحقق مما إذا كان الماتريكول مطابقاً في العمود C (Index 2)
+            row_matricule = str(row[2]).strip() if len(row) > 2 else ""
+            if row_matricule.lower() == str(matricule).strip().lower():
                 
                 def fmt_date(val):
                     if val and str(val).lower() not in ["nan", "nat", "", "néant", "None"]:
@@ -215,9 +219,9 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                         return str(val).strip()
                     return ""
 
-                # تعديل الأعمدة حسب ترتيب Google Sheet الخاص بك (عادة Nom=2, Prénom=3, Fonction=12...)
-                nom_val = str(row[2]).strip() if len(row) > 2 else ""      # C (Nom)
-                prenom_val = str(row[3]).strip() if len(row) > 3 else ""   # D (Prénom)
+                nom_val = str(row[0]).strip() if len(row) > 0 else ""      # A (Nom)
+                prenom_val = str(row[1]).strip() if len(row) > 1 else ""   # B (Prénom)
+                mat_val = str(row[2]).strip() if len(row) > 2 else ""      # C (Matricule)
                 dt_auth = fmt_date(row[4]) if len(row) > 4 else ""         # E
                 fonction_val = str(row[12]).strip() if len(row) > 12 else "" # M (Fonction)
                 engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
@@ -229,6 +233,7 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                 return {
                     "Nom": nom_val,
                     "Prenom": prenom_val,
+                    "Matricule": mat_val,
                     "Fonction": fonction_val,
                     "Date_Autorisation": dt_auth,
                     "Examen_Medical": dt_med,
@@ -292,7 +297,7 @@ if matricule_search != st.session_state["last_matricule"] or selected_page != st
     
     dates_info = get_agent_dates_and_details(matricule_search, page_type=selected_page) if matricule_search else {}
 
-    st.session_state["matricule"] = matricule_search
+    st.session_state["matricule"] = dates_info.get("Matricule", matricule_search)
     st.session_state["nom"] = dates_info.get("Nom", "")
     st.session_state["prenom"] = dates_info.get("Prenom", "")
     st.session_state["fonction"] = dates_info.get("Fonction", "Chef de Train" if selected_page == "Conduite" else "Chef Formation Trains")
