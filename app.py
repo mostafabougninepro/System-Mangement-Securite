@@ -54,8 +54,9 @@ USERS_FILE = os.path.join(BASE_DIR, "users_db.json")
 PHOTOS_ZIP = os.path.join(BASE_DIR, "photos all.zip")
 EXTRACTED_PHOTOS_DIR = os.path.join(BASE_DIR, "_extracted_photos")
 
-# رابط Google Sheets بصيغة التصدير المباشر CSV
-GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz_31fa5jVtp2XvGWj3-HdKubKsG3AH2po3XSFJ8ZdKQs1f0nHRcgHG9Ah4zaziQ/pub?output=csv"
+# ================= LINKS GOOGLE SHEETS =================
+GOOGLE_SHEET_CONDUITE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz_31fa5jVtp2XvGWj3-HdKubKsG3AH2po3XSFJ8ZdKQs1f0nHRcgHG9Ah4zaziQ/pub?output=csv"
+GOOGLE_SHEET_FORMATION_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz_31fa5jVtp2XvGWj3-HdKubKsG3AH2po3XSFJ8ZdKQs1f0nHRcgHG9Ah4zaziQ/pub?output=csv&gid=1098236842"
 
 # ================= ================= =================
 # 1. BASE DE DONNEES UTILISATEURS
@@ -223,7 +224,9 @@ def get_official_agent_info(matricule):
 @st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule, page_type="conduite"):
     try:
-        req = urllib.request.Request(GOOGLE_SHEET_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        target_url = GOOGLE_SHEET_FORMATION_URL if page_type.lower() == "formation" else GOOGLE_SHEET_CONDUITE_URL
+        
+        req = urllib.request.Request(target_url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
             content = response.read().decode('utf-8')
             
@@ -240,13 +243,12 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                         return str(val).strip()
                     return ""
 
-                # tstkhdm nafss les indices l jmi3 les types (Conduite w Formation) 3la 7sab la position li 3titini
-                dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E (Date d'autorisation)
-                engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N (Engin)
-                ligne_site_val = str(row[14]).strip() if len(row) > 14 else "" # O (Ligne / Site)
-                dt_med = fmt_date(row[19]) if len(row) > 19 else ""      # T (Date prochaine VM)
-                dt_psy = fmt_date(row[24]) if len(row) > 24 else ""      # Y (Date prochain Psy)
-                dt_prof = fmt_date(row[27]) if len(row) > 27 else ""     # AB (Date prochaine évaluation)
+                dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E
+                engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
+                ligne_site_val = str(row[14]).strip() if len(row) > 14 else "" # O
+                dt_med = fmt_date(row[19]) if len(row) > 19 else ""      # T
+                dt_psy = fmt_date(row[24]) if len(row) > 24 else ""      # Y
+                dt_prof = fmt_date(row[27]) if len(row) > 27 else ""     # AB
 
                 return {
                     "Date_Autorisation": dt_auth,
@@ -296,7 +298,7 @@ st.markdown("### 🔍 Recherche & Identification de l'Agent")
 st.session_state.setdefault("last_matricule", "")
 st.session_state.setdefault("last_page_type", "Conduite")
 
-# جعل اختيار "Type de Registre" في الأعلى ثم يليه "Matricule"
+# Type de Registre أولاً ثم Matricule ثانياً
 selected_page = st.selectbox("Type de Registre", ["Conduite", "Formation"])
 matricule_search = st.text_input("Saisir le Matricule de l'agent :", placeholder="Exemple: 42685P")
 
@@ -316,7 +318,7 @@ if matricule_search != st.session_state["last_matricule"] or selected_page != st
         st.session_state["nom"] = ""
         st.session_state["prenom"] = ""
         st.session_state["matricule"] = matricule_search
-        st.session_state["fonction"] = "Chef de Train"
+        st.session_state["fonction"] = "Chef de Formation" if selected_page == "Formation" else "Chef de Train"
 
     config_info = determine_template_and_mapping(st.session_state.get("fonction", ""))
     st.session_state["dt_auth"] = dates_info.get("Date_Autorisation", "")
