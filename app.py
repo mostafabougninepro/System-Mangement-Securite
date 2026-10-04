@@ -207,7 +207,6 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
             if not row or len(row) <= 2:
                 continue
             
-            # التحقق مما إذا كان الماتريكول مطابقاً في العمود C (Index 2)
             row_matricule = str(row[2]).strip() if len(row) > 2 else ""
             if row_matricule.lower() == str(matricule).strip().lower():
                 
@@ -376,14 +375,17 @@ def generate_custom_excel():
 
     if final_photo_source is not None:
         pil_img = PILImage.open(final_photo_source if isinstance(final_photo_source, str) else io.BytesIO(final_photo_source.read()))
-        target_w, target_h = int(2.0 * 37.8), int(1.44 * 37.8)
+        
+        # ضبط القياسات بدقة باش متخرجش على الخلايا C6, C7, C8
+        target_w, target_h = int(1.8 * 37.8), int(1.3 * 37.8)
         pil_img = pil_img.resize((target_w, target_h), PILImage.Resampling.LANCZOS)
         
         img_temp_path = os.path.join(BASE_DIR, "_temp_photo.png")
         pil_img.save(img_temp_path)
 
         xl_img = OpenpyxlImage(img_temp_path)
-        xl_img.width, xl_img.height = target_w, target_h
+        xl_img.width = target_w
+        xl_img.height = target_h
         sheet.add_image(xl_img, "B5")
 
     output = io.BytesIO()
