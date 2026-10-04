@@ -194,34 +194,6 @@ def get_agent_photo(matricule):
             pass
     return None, "Photo non trouvable"
 
-def get_official_agent_info(matricule):
-    excel_path = next((os.path.join(BASE_DIR, f) for f in os.listdir(BASE_DIR) if "mis_a_jour" in f.lower() or "photo" in f.lower() and f.endswith(".xlsx")), None)
-    if not excel_path or not os.path.exists(excel_path):
-        return None
-    try:
-        xl = pd.ExcelFile(excel_path)
-        for sheet_name in xl.sheet_names:
-            df = pd.read_excel(excel_path, sheet_name=sheet_name)
-            mle_col = next((c for c in df.columns if str(c).strip().lower() in ["mle", "matricule"]), None)
-            if mle_col:
-                df[mle_col] = df[mle_col].astype(str).str.strip()
-                agent = df[df[mle_col].str.lower() == str(matricule).strip().lower()]
-                if not agent.empty:
-                    row = agent.iloc[0]
-                    full_name = str(row.get("Nom /Prénom", row.get("Nom", ""))).strip()
-                    parts = full_name.split()
-                    nom = parts[0] if parts else ""
-                    prenom = " ".join(parts[1:]) if len(parts) > 1 else str(row.get("Prénom", "")).strip()
-                    return {
-                        "Nom": nom,
-                        "Prenom": prenom,
-                        "Fonction": str(row.get("Fonction", "")).strip() if pd.notnull(row.get("Fonction")) else ""
-                    }
-    except Exception:
-        pass
-    return None
-
-@st.cache_data(ttl=60)
 def get_agent_dates_and_details(matricule, page_type="conduite"):
     try:
         target_url = GOOGLE_SHEET_FORMATION_URL if page_type.lower() == "formation" else GOOGLE_SHEET_CONDUITE_URL
@@ -244,6 +216,7 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                     return ""
 
                 dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E
+                fonction_val = str(row[12]).strip() if len(row) > 12 else "" # M (Fonction)
                 engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
                 ligne_site_val = str(row[14]).strip() if len(row) > 14 else "" # O
                 dt_med = fmt_date(row[19]) if len(row) > 19 else ""      # T
@@ -251,6 +224,7 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                 dt_prof = fmt_date(row[27]) if len(row) > 27 else ""     # AB
 
                 return {
+                    "Fonction": fonction_val,
                     "Date_Autorisation": dt_auth,
                     "Examen_Medical": dt_med,
                     "Examen_Psychotechnique": dt_psy,
@@ -264,18 +238,23 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
     
 def determine_template_and_mapping(fonction):
     f_lower = fonction.lower().strip()
-    if "manœuvre" in f_lower or "manoeuvre" in f_lower or "crmv" in f_lower:
-        keyword = "crmv"
-        default_eng = "E1450 , E1400 , Z2M , DH400 , DH350 , DM600"
-        default_sit = " Site Voyageurs Kénitra "
-    elif "formation" in f_lower or "cft" in f_lower:
-        keyword = "cft"
-        default_eng = "E1450 , E1400 , E1250 , Z2M , DH400 , DM600"
-        default_sit = " Site Voyageurs Kénitra "
-    elif "ligne" in f_lower or "cl" in f_lower:
+    
+    if "conducteur de ligne" in f_lower:
         keyword = "cl"
         default_eng = "E1450 , E1400 , Z2M"
         default_sit = ""
+    elif "chef de trains" in f_lower or "chef de train" in f_lower:
+        keyword = "ctr"
+        default_eng = "E1450 , E1400 , E1250 , Z2M , DH400"
+        default_sit = ""
+    elif "conducteur de manœuvre" in f_lower or "conducteur de manoeuvre" in f_lower:
+        keyword = "crmv"
+        default_eng = "E1450 , E1400 , Z2M , DH400 , DH350 , DM600"
+        default_sit = " Site Voyageurs Kénitra "
+    elif "chef formation trains" in f_lower:
+        keyword = "cft"
+        default_eng = "E1450 , E1400 , E1250 , Z2M , DH400 , DM600"
+        default_sit = " Site Voyageurs Kénitra "
     else:
         keyword = "ctr"
         default_eng = "E1450 , E1400 , E1250 , Z2M , DH400"
@@ -288,6 +267,7 @@ def determine_template_and_mapping(fonction):
             break
 
     return {
+        "keyword": keyword.upper(),
         "template": matched_file,
         "default_engins": default_eng,
         "default_site": default_sit,
@@ -298,7 +278,6 @@ st.markdown("### 🔍 Recherche & Identification de l'Agent")
 st.session_state.setdefault("last_matricule", "")
 st.session_state.setdefault("last_page_type", "Conduite")
 
-# Type de Registre أولاً ثم Matricule ثانياً
 selected_page = st.selectbox("Type de Registre", ["Conduite", "Formation"])
 matricule_search = st.text_input("Saisir le Matricule de l'agent :", placeholder="Exemple: 42685P")
 
@@ -306,21 +285,14 @@ if matricule_search != st.session_state["last_matricule"] or selected_page != st
     st.session_state["last_matricule"] = matricule_search
     st.session_state["last_page_type"] = selected_page
     
-    official_info = get_official_agent_info(matricule_search) if matricule_search else None
     dates_info = get_agent_dates_and_details(matricule_search, page_type=selected_page) if matricule_search else {}
 
-    if official_info:
-        st.session_state["nom"] = official_info["Nom"]
-        st.session_state["prenom"] = official_info["Prenom"]
-        st.session_state["matricule"] = matricule_search
-        st.session_state["fonction"] = official_info["Fonction"]
-    else:
-        st.session_state["nom"] = ""
-        st.session_state["prenom"] = ""
-        st.session_state["matricule"] = matricule_search
-        st.session_state["fonction"] = "Chef de Formation" if selected_page == "Formation" else "Chef de Train"
+    st.session_state["matricule"] = matricule_search
+    st.session_state["nom"] = ""
+    st.session_state["prenom"] = ""
+    st.session_state["fonction"] = dates_info.get("Fonction", "Chef de Train" if selected_page == "Conduite" else "Chef Formation Trains")
 
-    config_info = determine_template_and_mapping(st.session_state.get("fonction", ""))
+    config_info = determine_template_and_mapping(st.session_state["fonction"])
     st.session_state["dt_auth"] = dates_info.get("Date_Autorisation", "")
     st.session_state["dt_med"] = dates_info.get("Examen_Medical", "")
     st.session_state["dt_psy"] = dates_info.get("Examen_Psychotechnique", "")
@@ -411,8 +383,11 @@ def generate_custom_excel():
 
 if st.button("⚡ Générer la Carte d'Habilitation", use_container_width=True):
     excel_file = generate_custom_excel()
-    clean_nom = nom_input.strip().upper() if nom_input.strip() else "AGENT"
-    file_download_name = f"Carte_{clean_nom}.xlsx"
+    config = determine_template_and_mapping(fonction_input)
+    card_type_prefix = config["keyword"]
+    # استخدام المسافة العادية بدون تعويض بـ Underscore في اسم العائلة
+    clean_nom = " ".join(nom_input.strip().upper().split()) if nom_input.strip() else "AGENT"
+    file_download_name = f"Carte_{card_type_prefix}_{clean_nom}.xlsx"
 
     st.success(f"✅ Document d'habilitation prêt : {file_download_name}")
     st.download_button(
