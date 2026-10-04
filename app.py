@@ -132,33 +132,6 @@ if st.session_state["user_role"] == "Admin":
 else:
     menu = "🪪 Cartes d'Habilitation"
 
-# ================= ================= =================
-# زر التحديث اليدوي (Mise à jour de registre)
-# ================= ================= =================
-st.sidebar.markdown("---")
-st.sidebar.subheader("🔄 Gestion Registre")
-if st.sidebar.button("Mise à jour de registre", use_container_width=True):
-    try:
-        # تحديث سجل القيادة
-        req_c = urllib.request.Request(GOOGLE_SHEET_CONDUITE_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_c, timeout=5) as response_c:
-            content_c = response_c.read().decode('utf-8')
-            path_c = os.path.join(BASE_DIR, "registre_conduite.csv")
-            with open(path_c, "w", encoding="utf-8") as f_c:
-                f_c.write(content_c)
-                
-        # تحديث سجل التكوين
-        req_f = urllib.request.Request(GOOGLE_SHEET_FORMATION_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_f, timeout=5) as response_f:
-            content_f = response_f.read().decode('utf-8')
-            path_f = os.path.join(BASE_DIR, "registre_formation.csv")
-            with open(path_f, "w", encoding="utf-8") as f_f:
-                f_f.write(content_f)
-                
-        st.sidebar.success("✅ Registres mis à jour avec succès !")
-    except Exception as e:
-        st.sidebar.error(f"❌ Échec de la mise à jour: {e}")
-
 st.sidebar.markdown("---")
 if st.sidebar.button("🚪 Déconnexion", use_container_width=True):
     st.session_state["logged_in"] = False
@@ -403,6 +376,7 @@ def generate_custom_excel():
     if final_photo_source is not None:
         pil_img = PILImage.open(final_photo_source if isinstance(final_photo_source, str) else io.BytesIO(final_photo_source.read()))
         
+        # 🟢 هنا تقدر تبدل الأرقام (الرض والارتفاع) باش تقادها على ذوقك وسط C6, C7, C8
         target_w, target_h = int(2.5 * 37.8), int(3.5 * 37.8)  
         pil_img = pil_img.resize((target_w, target_h), PILImage.Resampling.LANCZOS)
         
@@ -412,7 +386,7 @@ def generate_custom_excel():
         xl_img = OpenpyxlImage(img_temp_path)
         xl_img.width = target_w
         xl_img.height = target_h
-        sheet.add_image(xl_img, "C6")
+        sheet.add_image(xl_img, "C6")  # الصورة غاتثبت هنا فـ C6 (وسط الكاسيوهات C6, C7, C8)
 
     output = io.BytesIO()
     wb.save(output)
