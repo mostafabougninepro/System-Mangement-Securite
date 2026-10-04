@@ -241,7 +241,6 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                     return ""
 
                 if page_type.lower() == "formation":
-                    # مواضع الأعمدة الخاصة بصفحة Formation
                     dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E
                     engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
                     ligne_site_val = str(row[15]).strip() if len(row) > 15 else "" # P
@@ -249,7 +248,6 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                     dt_psy = fmt_date(row[25]) if len(row) > 25 else ""      # Z
                     dt_prof = fmt_date(row[28]) if len(row) > 28 else ""     # AC
                 else:
-                    # مواضع الأعمدة الخاصة بصفحة Conduite
                     dt_auth = fmt_date(row[4]) if len(row) > 4 else ""        # E
                     engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
                     ligne_site_val = str(row[14]).strip() if len(row) > 14 else "" # O
@@ -303,12 +301,17 @@ def determine_template_and_mapping(fonction):
 st.markdown("### 🔍 Recherche & Identification de l'Agent")
 
 st.session_state.setdefault("last_matricule", "")
-matricule_search = st.text_input("Saisir le Matricule de l'agent :", placeholder="Exemple: 42685P")
+st.session_state.setdefault("last_page_type", "Conduite")
 
-if matricule_search != st.session_state["last_matricule"]:
+matricule_search = st.text_input("Saisir le Matricule de l'agent :", placeholder="Exemple: 42685P")
+selected_page = st.selectbox("Type de Registre", ["Conduite", "Formation"])
+
+if matricule_search != st.session_state["last_matricule"] or selected_page != st.session_state["last_page_type"]:
     st.session_state["last_matricule"] = matricule_search
+    st.session_state["last_page_type"] = selected_page
+    
     official_info = get_official_agent_info(matricule_search) if matricule_search else None
-    dates_info = get_agent_dates_and_details(matricule_search) if matricule_search else {}
+    dates_info = get_agent_dates_and_details(matricule_search, page_type=selected_page) if matricule_search else {}
 
     if official_info:
         st.session_state["nom"] = official_info["Nom"]
