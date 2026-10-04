@@ -376,8 +376,8 @@ def generate_custom_excel():
     if final_photo_source is not None:
         pil_img = PILImage.open(final_photo_source if isinstance(final_photo_source, str) else io.BytesIO(final_photo_source.read()))
         
-        # ضبط القياسات بدقة باش متخرجش على الخلايا C6, C7, C8
-        target_w, target_h = int(1.8 * 37.8), int(1.3 * 37.8)
+        # 🟢 هنا تقدر تبدل الأرقام (الرض والارتفاع) باش تقادها على ذوقك وسط C6, C7, C8
+        target_w, target_h = int(2.5 * 37.8), int(3.5 * 37.8)  
         pil_img = pil_img.resize((target_w, target_h), PILImage.Resampling.LANCZOS)
         
         img_temp_path = os.path.join(BASE_DIR, "_temp_photo.png")
@@ -386,7 +386,7 @@ def generate_custom_excel():
         xl_img = OpenpyxlImage(img_temp_path)
         xl_img.width = target_w
         xl_img.height = target_h
-        sheet.add_image(xl_img, "B5")
+        sheet.add_image(xl_img, "C6")  # الصورة غاتثبت هنا فـ C6 (وسط الكاسيوهات C6, C7, C8)
 
     output = io.BytesIO()
     wb.save(output)
