@@ -207,6 +207,7 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
             if not row or len(row) <= 2:
                 continue
             
+            # Matricule kayn f la ligne C (Index 2)
             row_matricule = str(row[2]).strip() if len(row) > 2 else ""
             if row_matricule.lower() == str(matricule).strip().lower():
                 
@@ -218,16 +219,22 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                         return str(val).strip()
                     return ""
 
-                nom_val = str(row[0]).strip() if len(row) > 0 else ""      # A (Nom)
-                prenom_val = str(row[1]).strip() if len(row) > 1 else ""   # B (Prénom)
-                mat_val = str(row[2]).strip() if len(row) > 2 else ""      # C (Matricule)
-                dt_auth = fmt_date(row[4]) if len(row) > 4 else ""         # E
-                fonction_val = str(row[12]).strip() if len(row) > 12 else "" # M (Fonction)
-                engin_val = str(row[13]).strip() if len(row) > 13 else ""  # N
-                ligne_site_val = str(row[14]).strip() if len(row) > 14 else "" # O
-                dt_med = fmt_date(row[19]) if len(row) > 19 else ""        # T
-                dt_psy = fmt_date(row[24]) if len(row) > 24 else ""        # Y
-                dt_prof = fmt_date(row[27]) if len(row) > 27 else ""       # AB
+                def get_cell(idx):
+                    if len(row) > idx:
+                        return str(row[idx]).strip()
+                    return ""
+
+                # Mapping exact b tariqa s-sahhiha (Index dyal python kaybda mn 0: A=0, B=1, C=2, D=3, L=11, M=12, N=13, S=18, X=23, AA=26)
+                nom_val = get_cell(0)         # A: Nom
+                prenom_val = get_cell(1)      # B: Prénom
+                mat_val = get_cell(2)         # C: Matricule
+                dt_auth = fmt_date(get_cell(3)) # D: Date d'autorisation
+                fonction_val = get_cell(11)   # L: Fonction
+                engin_val = get_cell(12)      # M: Engins
+                ligne_site_val = get_cell(13) # N: Ligne / Site
+                dt_prof = fmt_date(get_cell(23))  # X: Examen pro
+                dt_med = fmt_date(get_cell(26))   # AA: Examen médical
+                dt_psy = fmt_date(get_cell(18))   # S: Examen psycho
 
                 return {
                     "Nom": nom_val,
@@ -376,7 +383,6 @@ def generate_custom_excel():
     if final_photo_source is not None:
         pil_img = PILImage.open(final_photo_source if isinstance(final_photo_source, str) else io.BytesIO(final_photo_source.read()))
         
-        # 🟢 هنا تقدر تبدل الأرقام (الرض والارتفاع) باش تقادها على ذوقك وسط C6, C7, C8
         target_w, target_h = int(2.5 * 37.8), int(3.5 * 37.8)  
         pil_img = pil_img.resize((target_w, target_h), PILImage.Resampling.LANCZOS)
         
@@ -386,7 +392,7 @@ def generate_custom_excel():
         xl_img = OpenpyxlImage(img_temp_path)
         xl_img.width = target_w
         xl_img.height = target_h
-        sheet.add_image(xl_img, "C6")  # الصورة غاتثبت هنا فـ C6 (وسط الكاسيوهات C6, C7, C8)
+        sheet.add_image(xl_img, "C6")
 
     output = io.BytesIO()
     wb.save(output)
