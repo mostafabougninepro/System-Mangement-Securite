@@ -55,8 +55,8 @@ PHOTOS_ZIP = os.path.join(BASE_DIR, "photos all.zip")
 EXTRACTED_PHOTOS_DIR = os.path.join(BASE_DIR, "_extracted_photos")
 
 # ================= LINKS GOOGLE SHEETS =================
-GOOGLE_SHEET_CONDUITE_URL = "https://docs.google.com/spreadsheets/d/1zDvBCmZBDO-Wuu7FMTbMwssDo-zfewXe0NDPOkoya5c/export?format=csv"
-GOOGLE_SHEET_FORMATION_URL = "https://docs.google.com/spreadsheets/d/1zDvBCmZBDO-Wuu7FMTbMwssDo-zfewXe0NDPOkoya5c/export?format=csv&gid=1098236842"
+GOOGLE_SHEET_CONDUITE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz_31fa5jVtp2XvGWj3-HdKubKsG3AH2po3XSFJ8ZdKQs1f0nHRcgHG9Ah4zaziQ/pub?output=csv"
+GOOGLE_SHEET_FORMATION_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz_31fa5jVtp2XvGWj3-HdKubKsG3AH2po3XSFJ8ZdKQs1f0nHRcgHG9Ah4zaziQ/pub?output=csv&gid=1098236842"
 
 # ================= ================= =================
 # 1. BASE DE DONNEES UTILISATEURS
@@ -224,28 +224,17 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                         return str(row[idx]).strip()
                     return ""
 
-                # Mapping exact حسب الترتيب الجديد اللي عطيتينا:
-                # A = 0 (Nom)
-                # B = 1 (Prenom)
-                # C = 2 (Matricule)
-                # D = 3 (Date d'autorisation)
-                # L = 11 (Fonction)
-                # M = 12 (Engins)
-                # N = 13 (Ligne / Site)
-                # X = 23 (Examen pro)
-                # AA = 26 (Examen médical)
-                # S = 18 (Examen psycho)
-                
-                nom_val = get_cell(0)         # A
-                prenom_val = get_cell(1)      # B
-                mat_val = get_cell(2)         # C
-                dt_auth = fmt_date(get_cell(3)) # D
-                fonction_val = get_cell(11)   # L
-                engin_val = get_cell(12)      # M
-                ligne_site_val = get_cell(13) # N
-                dt_prof = fmt_date(get_cell(23))  # X
-                dt_med = fmt_date(get_cell(26))   # AA
-                dt_psy = fmt_date(get_cell(18))   # S
+                # Mapping exact b tariqa s-sahhiha (Index dyal python kaybda mn 0)
+                nom_val = get_cell(0)         # A: Nom
+                prenom_val = get_cell(1)      # B: Prénom
+                mat_val = get_cell(2)         # C: Matricule
+                dt_auth = fmt_date(get_cell(3)) # D: Date d'autorisation
+                fonction_val = get_cell(11)   # L: Fonction
+                engin_val = get_cell(12)      # M: Engins
+                ligne_site_val = get_cell(13) # N: Ligne / Site
+                dt_prof = fmt_date(get_cell(23))  # X: Examen pro
+                dt_med = fmt_date(get_cell(26))   # AA: Examen médical
+                dt_psy = fmt_date(get_cell(18))   # S: Examen psycho
 
                 return {
                     "Nom": nom_val,
