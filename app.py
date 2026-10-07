@@ -54,9 +54,9 @@ USERS_FILE = os.path.join(BASE_DIR, "users_db.json")
 PHOTOS_ZIP = os.path.join(BASE_DIR, "photos all.zip")
 EXTRACTED_PHOTOS_DIR = os.path.join(BASE_DIR, "_extracted_photos")
 
-# ================= LINKS GOOGLE SHEETS (Mis à jour) =================
-GOOGLE_SHEET_CONDUITE_URL = "https://docs.google.com/spreadsheets/d/1zDvBCmZBDO-Wuu7FMTbMwssDo-zfewXe0NDPOkoya5c/export?format=csv"
-GOOGLE_SHEET_FORMATION_URL = "https://docs.google.com/spreadsheets/d/1zDvBCmZBDO-Wuu7FMTbMwssDo-zfewXe0NDPOkoya5c/export?format=csv&gid=1098236842"
+# ================= LINKS GOOGLE SHEETS =================
+GOOGLE_SHEET_CONDUITE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz_31fa5jVtp2XvGWj3-HdKubKsG3AH2po3XSFJ8ZdKQs1f0nHRcgHG9Ah4zaziQ/pub?output=csv"
+GOOGLE_SHEET_FORMATION_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz_31fa5jVtp2XvGWj3-HdKubKsG3AH2po3XSFJ8ZdKQs1f0nHRcgHG9Ah4zaziQ/pub?output=csv&gid=1098236842"
 
 # ================= ================= =================
 # 1. BASE DE DONNEES UTILISATEURS
@@ -376,6 +376,7 @@ def generate_custom_excel():
     if final_photo_source is not None:
         pil_img = PILImage.open(final_photo_source if isinstance(final_photo_source, str) else io.BytesIO(final_photo_source.read()))
         
+        # 🟢 هنا تقدر تبدل الأرقام (الرض والارتفاع) باش تقادها على ذوقك وسط C6, C7, C8
         target_w, target_h = int(2.5 * 37.8), int(3.5 * 37.8)  
         pil_img = pil_img.resize((target_w, target_h), PILImage.Resampling.LANCZOS)
         
@@ -385,7 +386,7 @@ def generate_custom_excel():
         xl_img = OpenpyxlImage(img_temp_path)
         xl_img.width = target_w
         xl_img.height = target_h
-        sheet.add_image(xl_img, "C6")
+        sheet.add_image(xl_img, "C6")  # الصورة غاتثبت هنا فـ C6 (وسط الكاسيوهات C6, C7, C8)
 
     output = io.BytesIO()
     wb.save(output)
