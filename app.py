@@ -207,12 +207,11 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
             if not row or len(row) <= 2:
                 continue
             
-            # Matricule kayn f la ligne C (Index 2)
             row_matricule = str(row[2]).strip() if len(row) > 2 else ""
             if row_matricule.lower() == str(matricule).strip().lower():
                 
                 def fmt_date(val):
-                    if val and str(val).lower() not in ["nan", "nat", "", "néant", "None"]:
+                    if val and str(val).lower() not in ["nan", "nat", "", "néant", "None", "#ref!"]:
                         parsed_date = pd.to_datetime(val, errors='coerce', dayfirst=True)
                         if pd.notnull(parsed_date):
                             return parsed_date.strftime("%Y-%m-%d")
@@ -224,17 +223,17 @@ def get_agent_dates_and_details(matricule, page_type="conduite"):
                         return str(row[idx]).strip()
                     return ""
 
-                # Mapping exact b tariqa s-sahhiha (Index dyal python kaybda mn 0)
+                # Mapping exact selon l'ordre des colonnes réel du fichier:
                 nom_val = get_cell(0)         # A: Nom
                 prenom_val = get_cell(1)      # B: Prénom
                 mat_val = get_cell(2)         # C: Matricule
-                dt_auth = fmt_date(get_cell(3)) # D: Date d'autorisation
+                dt_auth = fmt_date(get_cell(4)) # E: Date d'autorisation
                 fonction_val = get_cell(11)   # L: Fonction
                 engin_val = get_cell(12)      # M: Engins
                 ligne_site_val = get_cell(13) # N: Ligne / Site
-                dt_prof = fmt_date(get_cell(23))  # X: Examen pro
-                dt_med = fmt_date(get_cell(26))   # AA: Examen médical
-                dt_psy = fmt_date(get_cell(18))   # S: Examen psycho
+                dt_psy = fmt_date(get_cell(18))   # S: Date prochain Psy
+                dt_prof = fmt_date(get_cell(23))  # X: Date prochaine évaluation (Examen pro)
+                dt_med = fmt_date(get_cell(26))   # AA: Date prochaine VM (Examen médical)
 
                 return {
                     "Nom": nom_val,
@@ -334,7 +333,7 @@ with col_p1:
 st.markdown("---")
 st.markdown("### 📝 Informations d'Habilitation")
 
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1, 1])
 with col1:
     nom_input = st.text_input("Nom", key="nom")
     matricule_input = st.text_input("Matricule", key="matricule")
