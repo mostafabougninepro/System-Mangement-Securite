@@ -54,9 +54,9 @@ USERS_FILE = os.path.join(BASE_DIR, "users_db.json")
 PHOTOS_ZIP = os.path.join(BASE_DIR, "photos all.zip")
 EXTRACTED_PHOTOS_DIR = os.path.join(BASE_DIR, "_extracted_photos")
 
-# ================= LINKS GOOGLE SHEETS =================
-GOOGLE_SHEET_CONDUITE_URL = "https://docs.google.com/spreadsheets/d/1xvLIind11DXvc7J7_NXsa27o3HIPRSYv/export?format=csv"
-GOOGLE_SHEET_FORMATION_URL = "https://docs.google.com/spreadsheets/d/1xvLIind11DXvc7J7_NXsa27o3HIPRSYv/export?format=csv"
+# ================= LINKS GOOGLE SHEETS (Mis à jour) =================
+GOOGLE_SHEET_CONDUITE_URL = "https://docs.google.com/spreadsheets/d/1zDvBCmZBDO-Wuu7FMTbMwssDo-zfewXe0NDPOkoya5c/export?format=csv"
+GOOGLE_SHEET_FORMATION_URL = "https://docs.google.com/spreadsheets/d/1zDvBCmZBDO-Wuu7FMTbMwssDo-zfewXe0NDPOkoya5c/export?format=csv&gid=1098236842"
 
 # ================= ================= =================
 # 1. BASE DE DONNEES UTILISATEURS
@@ -131,33 +131,6 @@ if st.session_state["user_role"] == "Admin":
     menu = st.sidebar.radio("Module actif :", ["🪪 Cartes d'Habilitation", "👥 Gestion des Accès"])
 else:
     menu = "🪪 Cartes d'Habilitation"
-
-# ================= ================= =================
-# زر التحديث اليدوي (Mise à jour de registre)
-# ================= ================= =================
-st.sidebar.markdown("---")
-st.sidebar.subheader("🔄 Gestion Registre")
-if st.sidebar.button("Mise à jour de registre", use_container_width=True):
-    try:
-        # تحديث سجل القيادة
-        req_c = urllib.request.Request(GOOGLE_SHEET_CONDUITE_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_c, timeout=5) as response_c:
-            content_c = response_c.read().decode('utf-8')
-            path_c = os.path.join(BASE_DIR, "registre_conduite.csv")
-            with open(path_c, "w", encoding="utf-8") as f_c:
-                f_c.write(content_c)
-                
-        # تحديث سجل التكوين
-        req_f = urllib.request.Request(GOOGLE_SHEET_FORMATION_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_f, timeout=5) as response_f:
-            content_f = response_f.read().decode('utf-8')
-            path_f = os.path.join(BASE_DIR, "registre_formation.csv")
-            with open(path_f, "w", encoding="utf-8") as f_f:
-                f_f.write(content_f)
-                
-        st.sidebar.success("✅ Registres mis à jour avec succès !")
-    except Exception as e:
-        st.sidebar.error(f"❌ Échec de la mise à jour: {e}")
 
 st.sidebar.markdown("---")
 if st.sidebar.button("🚪 Déconnexion", use_container_width=True):
@@ -336,4 +309,101 @@ if matricule_search != st.session_state["last_matricule"] or selected_page != st
     st.session_state["lignes"] = dates_info.get("Ligne_Site") or config_info["default_site"]
     st.session_state["engins"] = dates_info.get("Engin") or config_info["default_engins"]
 
-found_photo_path, search_status = get_agent_photo(matricule_
+found_photo_path, search_status = get_agent_photo(matricule_search)
+final_photo_source = None
+
+col_p1, col_p2 = st.columns([1, 3])
+with col_p1:
+    uploaded_photo = st.file_uploader("Photo d'identité (Optionnel)", type=["jpg", "jpeg", "png"])
+    if uploaded_photo is not None:
+        final_photo_source = uploaded_photo
+        st.image(uploaded_photo, caption="Photo importée", width=115)
+    elif found_photo_path:
+        final_photo_source = found_photo_path
+        st.image(found_photo_path, caption=f"✅ {search_status}", width=115)
+    elif matricule_search.strip():
+        st.warning("⚠️ Photo non disponible")
+
+st.markdown("---")
+st.markdown("### 📝 Informations d'Habilitation")
+
+col1, col2 = st.columns(2)
+with col1:
+    nom_input = st.text_input("Nom", key="nom")
+    matricule_input = st.text_input("Matricule", key="matricule")
+    fonction_input = st.text_input("Fonction (Titre d'habilitation)", key="fonction")
+    dt_autorisation = st.text_input("Date d'autorisation", key="dt_auth")
+    dt_medical = st.text_input("Date d'expiration de l'examen médical", key="dt_med")
+
+with col2:
+    prenom_input = st.text_input("Prénom", key="prenom")
+    dt_professionnel = st.text_input("Date d'expiration de l'examen pro", key="dt_prof")
+    dt_psycho = st.text_input("Date d'expiration de l'examen psycho", key="dt_psy")
+
+lignes_sites = st.text_input("Autorisé aux lignes suivantes", key="lignes")
+materiel_locos = st.text_input("Autorisé à arrêter أو Autorisé à conduire", key="engins")
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+def generate_custom_excel():
+    config = determine_template_and_mapping(fonction_input)
+    tmpl_filename = config["template"]
+    
+    tmpl_path = os.path.join(BASE_DIR, tmpl_filename)
+    if not os.path.exists(tmpl_path):
+        for f in os.listdir(BASE_DIR):
+            if f.endswith(".xlsx") and any(k in f.lower() for k in ["ctr", "cl", "cft", "crmv"]):
+                tmpl_path = os.path.join(BASE_DIR, f)
+                break
+
+    wb = openpyxl.load_workbook(tmpl_path)
+    sheet = wb.active
+
+    sheet["E6"] = nom_input
+    sheet["J6"] = prenom_input
+    sheet["E7"] = matricule_input
+    sheet["G10"] = dt_autorisation
+    sheet["G11"] = dt_professionnel
+    sheet["G12"] = dt_medical
+    sheet["G13"] = dt_psycho
+
+    sheet["L5"] = materiel_locos
+    sheet["L5"].alignment = openpyxl.styles.Alignment(wrap_text=True, vertical="center", horizontal="center")
+
+    sheet["M5"] = lignes_sites
+    sheet["M5"].alignment = openpyxl.styles.Alignment(wrap_text=True, vertical="center", horizontal="center")
+
+    if final_photo_source is not None:
+        pil_img = PILImage.open(final_photo_source if isinstance(final_photo_source, str) else io.BytesIO(final_photo_source.read()))
+        
+        target_w, target_h = int(2.5 * 37.8), int(3.5 * 37.8)  
+        pil_img = pil_img.resize((target_w, target_h), PILImage.Resampling.LANCZOS)
+        
+        img_temp_path = os.path.join(BASE_DIR, "_temp_photo.png")
+        pil_img.save(img_temp_path)
+
+        xl_img = OpenpyxlImage(img_temp_path)
+        xl_img.width = target_w
+        xl_img.height = target_h
+        sheet.add_image(xl_img, "C6")
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
+if st.button("⚡ Générer la Carte d'Habilitation", use_container_width=True):
+    excel_file = generate_custom_excel()
+    config = determine_template_and_mapping(fonction_input)
+    card_type_prefix = config["keyword"]
+    clean_nom = " ".join(nom_input.strip().upper().split()) if nom_input.strip() else "AGENT"
+    file_download_name = f"Carte_{card_type_prefix}_{clean_nom}.xlsx"
+
+    st.success(f"✅ Document d'habilitation prêt : {file_download_name}")
+    st.download_button(
+        label=f"📥 Télécharger {file_download_name}",
+        data=excel_file,
+        file_name=file_download_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
